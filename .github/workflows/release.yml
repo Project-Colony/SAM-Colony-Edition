@@ -1,0 +1,224 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag (e.g. v0.6.0-alpha or nightly)"
+        required: true
+        default: "nightly"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+            # No bundle - we ship the raw ELF binary with libsteam_api.so
+            # embedded via include_bytes! (see src-tauri/src/bootstrap.rs).
+            bundles: ""
+          # macOS Silicon runner cross-compiles both arches in one job.
+          # Avoids waiting for scarce macos-13 (Intel) runners on free tier.
+          - platform: macos-14
+            target: aarch64-apple-darwin
+            bundles: "app"
+            extra_target: x86_64-apple-darwin
+          - platform: windows-latest
+            target: x86_64-pc-windows-msvc
+            # No --bundles: produces only the raw .exe in target/.../release/
+            bundles: ""
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Linux deps
+        if: startsWith(matrix.platform, 'ubuntu-')
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            libsoup-3.0-dev
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}${{ matrix.extra_target && format(',{0}', matrix.extra_target) || '' }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "src-tauri -> target"
+          key: ${{ matrix.target }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build
+        shell: bash
+        run: |
+          if [ -n "${{ matrix.bundles }}" ]; then
+            npm run tauri build -- --target ${{ matrix.target }} --bundles ${{ matrix.bundles }}
+          else
+            npm run tauri build -- --target ${{ matrix.target }} --no-bundle
+          fi
+          if [ -n "${{ matrix.extra_target }}" ]; then
+            if [ -n "${{ matrix.bundles }}" ]; then
+              npm run tauri build -- --target ${{ matrix.extra_target }} --bundles ${{ matrix.bundles }}
+            else
+              npm run tauri build -- --target ${{ matrix.extra_target }} --no-bundle
+            fi
+          fi
+        env:
+          NO_STRIP: "true"
+
+      # Stage exactly one self-contained executable per platform. The
+      # Steamworks runtime library is embedded in the binary at compile time
+      # by bootstrap.rs (see src-tauri/src/bootstrap.rs) and extracted to
+      # LOCALAPPDATA / Application Support on first launch.
+      - name: Stage release artifacts
+        shell: bash
+        run: |
+          mkdir -p staged
+          target_root="src-tauri/target/${{ matrix.target }}/release"
+          bundle_dir="${target_root}/bundle"
+
+          shopt -s nullglob
+
+          # Filenames stay static across releases so colony.json can hardcode
+          # them (matches the convention used by Spotter, Grape, etc.).
+          case "${{ matrix.target }}" in
+            *linux-gnu)
+              # Raw ELF binary. libsteam_api.so is embedded via
+              # include_bytes! in bootstrap.rs and extracted to
+              # ~/.local/share/SAM-Colony-Edition/ on first launch.
+              cp -v "$target_root/samira" "staged/sam-colony-edition-linux"
+              chmod +x "staged/sam-colony-edition-linux"
+              ;;
+            aarch64-apple-darwin)
+              # Raw Mach-O from each .app/Contents/MacOS/. The dylib is
+              # embedded via include_bytes! in bootstrap.rs (vendored dylib
+              # is a Mach-O universal binary containing both archs).
+              # macos-14 runner cross-compiles both Silicon and Intel here.
+              arm_app=$(find "src-tauri/target/aarch64-apple-darwin/release/bundle/macos" -maxdepth 1 -name "*.app" -type d | head -1)
+              if [ -n "$arm_app" ]; then
+                cp -v "$arm_app/Contents/MacOS/samira" "staged/sam-colony-edition-macos"
+                chmod +x "staged/sam-colony-edition-macos"
+              fi
+              x86_app=$(find "src-tauri/target/x86_64-apple-darwin/release/bundle/macos" -maxdepth 1 -name "*.app" -type d 2>/dev/null | head -1)
+              if [ -n "$x86_app" ]; then
+                cp -v "$x86_app/Contents/MacOS/samira" "staged/sam-colony-edition-macos-x86"
+                chmod +x "staged/sam-colony-edition-macos-x86"
+              fi
+              ;;
+            *windows-msvc)
+              # Single .exe. DLL embedded via include_bytes! in bootstrap.rs,
+              # extracted to %LOCALAPPDATA% on first launch.
+              cp -v "$target_root/samira.exe" "staged/sam-colony-edition-windows.exe"
+              ;;
+          esac
+
+          # Per-platform SHA256SUMS file so concurrent matrix uploads don't
+          # overwrite each other on the Release. Use the full target triple
+          # (with last component first for sort-friendliness) so the two
+          # macOS arches don't collide.
+          short="$(echo "${{ matrix.target }}" | tr '[:upper:]' '[:lower:]')"
+          if command -v sha256sum >/dev/null; then
+            (cd staged && sha256sum * > "SHA256SUMS-${short}.txt")
+          else
+            (cd staged && shasum -a 256 * > "SHA256SUMS-${short}.txt")
+          fi
+
+          ls -la staged/
+          cat "staged/SHA256SUMS-${short}.txt"
+
+      - name: Upload to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+          name: ${{ github.event.inputs.tag || github.ref_name }}
+          draft: false
+          prerelease: ${{ github.event_name == 'workflow_dispatch' || !startsWith(github.ref, 'refs/tags/v') }}
+          generate_release_notes: ${{ startsWith(github.ref, 'refs/tags/v') }}
+          files: staged/*
+          fail_on_unmatched_files: true
+
+  scan:
+    name: VirusTotal scan
+    needs: build
+    runs-on: ubuntu-latest
+    if: success()
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check VT_API_KEY secret
+        id: check
+        env:
+          VT_API_KEY: ${{ secrets.VT_API_KEY }}
+        run: |
+          if [ -z "$VT_API_KEY" ]; then
+            echo "::warning::VT_API_KEY secret not set, skipping VirusTotal scan. See README for setup."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Resolve release tag
+        if: steps.check.outputs.skip != 'true'
+        id: tag
+        run: |
+          tag="${{ github.event.inputs.tag || github.ref_name }}"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Download release assets
+        if: steps.check.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p scan-assets
+          gh release download "${{ steps.tag.outputs.tag }}" \
+            --repo "${{ github.repository }}" \
+            --pattern 'sam-colony-edition-*' \
+            --dir scan-assets
+          ls -la scan-assets/
+
+      - name: Upload to VirusTotal
+        if: steps.check.outputs.skip != 'true'
+        id: vt
+        uses: crazy-max/ghaction-virustotal@v4
+        with:
+          vt_api_key: ${{ secrets.VT_API_KEY }}
+          files: |
+            scan-assets/sam-colony-edition-*
+
+      - name: Append VT analysis links to release body
+        if: steps.check.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ANALYSIS: ${{ steps.vt.outputs.analysis }}
+        run: |
+          tag="${{ steps.tag.outputs.tag }}"
+          existing=$(gh release view "$tag" --repo "${{ github.repository }}" --json body --jq .body)
+          {
+            printf '%s\n\n' "$existing"
+            echo "### VirusTotal scans"
+            echo
+            # outputs.analysis is comma-separated "file=url" pairs.
+            echo "$ANALYSIS" | tr ',' '\n' | while IFS='=' read -r file url; do
+              [ -z "$file" ] && continue
+              printf -- '- [`%s`](%s)\n' "$(basename "$file")" "$url"
+            done
+          } > body.md
+          gh release edit "$tag" --repo "${{ github.repository }}" --notes-file body.md

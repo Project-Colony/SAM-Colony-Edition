@@ -1,0 +1,52 @@
+{
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:1420"
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "category": "Utility",
+    "shortDescription": "Steam Achievement Manager",
+    "longDescription": "SAM - Colony Edition. Browse, unlock, and lock Steam achievements for any game in your library.",
+    "linux": {
+      "appimage": { "bundleMediaFramework": false }
+    },
+    "macOS": {
+      "minimumSystemVersion": "11.0"
+    }
+  },
+  "productName": "SAM-Colony-Edition",
+  "mainBinaryName": "samira",
+  "version": "0.6.0",
+  "identifier": "ai.projectcolony.sam",
+  "plugins": {},
+  "app": {
+    "security": {
+      "csp": null
+    },
+    "windows": [
+      {
+        "title": "SAM - Colony Edition",
+        "theme": "Light",
+        "decorations": true,
+        "resizable": true,
+        "fullscreen": false,
+        "useHttpsScheme": true,
+        "width": 1280,
+        "height": 720,
+        "minWidth": 960,
+        "minHeight": 600
+      }
+    ]
+  }
+}

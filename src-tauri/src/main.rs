@@ -1,0 +1,192 @@
+// Prevents additional console window on Windows in release, DO NOT REMOVE!!
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+#![allow(non_snake_case)]
+
+mod bootstrap;
+mod dataset;
+mod state;
+mod steam;
+mod vdf;
+
+use dataset::Game;
+use state::{AppState, ServiceAccess};
+use std::collections::HashMap;
+use std::sync::Mutex;
+use steam::{Achievement, Stat, User};
+use tauri::{AppHandle, Manager, State};
+
+fn main() {
+    // MUST run before any code that might trigger Steamworks DLL/dylib
+    // resolution. See bootstrap.rs for the full rationale.
+    bootstrap::bootstrap();
+
+    tauri::Builder::default()
+        .plugin(tauri_plugin_shell::init())
+        .manage(AppState {
+            data: Mutex::new(None),
+            client: Mutex::new(None),
+        })
+        .invoke_handler(tauri::generate_handler![
+            cmd_fetch_games,
+            cmd_request_app_name,
+            cmd_search_name,
+            cmd_start_client,
+            cmd_load_achievements,
+            cmd_load_achievement_icons,
+            cmd_commit_achievement,
+            cmd_store_stats,
+            cmd_load_statistics,
+            cmd_commit_statistics,
+            cmd_retrieve_user,
+        ])
+        .setup(|_app| {
+            Ok(())
+        })
+        .run(tauri::generate_context!())
+        .expect("error while running tauri application");
+}
+
+#[tauri::command]
+fn cmd_fetch_games(app_handle: AppHandle) -> Result<String, String> {
+    match dataset::fetch_games() {
+        Ok((games, status)) => {
+            let state: State<AppState> = app_handle.state();
+            *state.data.lock().unwrap() = Some(games);
+            Ok(status)
+        }
+        Err(e) => Err(format!("Failed to load database: {}", e)),
+    }
+}
+
+#[tauri::command]
+fn cmd_request_app_name(handle: AppHandle, appid: u32) -> String {
+    handle.data(|games| {
+        games.iter()
+            .find(|g| g.appid == appid)
+            .map(|g| g.name.clone())
+            .unwrap_or_default()
+    })
+}
+
+#[tauri::command]
+fn cmd_search_name(handle: AppHandle, query: String) -> Vec<Game> {
+    handle.data(|games| {
+        dataset::fuzzy_search(games, &query, 10)
+    })
+}
+
+#[tauri::command]
+fn cmd_start_client(app_handle: AppHandle, appid: u32) -> bool {
+    let state: State<AppState> = app_handle.state();
+    let c = state.client.lock().unwrap().take();
+    drop(c);
+
+    match steam::start_client(appid) {
+        Ok(client) => {
+            *state.client.lock().unwrap() = Some(client);
+            true
+        }
+        Err(e) => {
+            println!("Failed to start client: {}", e);
+            false
+        }
+    }
+}
+
+#[tauri::command]
+fn cmd_retrieve_user(app_handle: AppHandle) -> User {
+    let state: State<AppState> = app_handle.state();
+    let client = state.client.lock().unwrap().clone();
+
+    match client {
+        Some(client) => steam::retrieve_user(client),
+        None => {
+            println!("No Client Found");
+            User::default()
+        }
+    }
+}
+
+#[tauri::command]
+fn cmd_load_achievements(app_handle: AppHandle) -> Vec<Achievement> {
+    let state: State<AppState> = app_handle.state();
+    let client = state.client.lock().unwrap().clone();
+
+    match client {
+        Some(client) => steam::load_achievements(client).unwrap_or(Vec::new()),
+        None => {
+            println!("No Client Found");
+            Vec::new()
+        }
+    }
+}
+
+#[tauri::command]
+fn cmd_load_achievement_icons(app_handle: AppHandle, appid: u32) -> HashMap<String, String> {
+    let state: State<AppState> = app_handle.state();
+    let client = state.client.lock().unwrap().clone();
+
+    match client {
+        Some(_client) => steam::load_achievement_icons(appid),
+        None => {
+            println!("No Client Found");
+            HashMap::new()
+        }
+    }
+}
+
+#[tauri::command]
+fn cmd_commit_achievement(app_handle: AppHandle, name: String, unlocked: bool) {
+    let state: State<AppState> = app_handle.state();
+    let client = state.client.lock().unwrap().clone();
+    match client {
+        Some(client) => {
+            let _ = steam::commit_achievement(client, name, unlocked);
+        }
+        None => {
+            println!("No Client Found");
+        }
+    }
+}
+
+#[tauri::command]
+fn cmd_store_stats(app_handle: AppHandle) {
+    let state: State<AppState> = app_handle.state();
+    let client = state.client.lock().unwrap().clone();
+    match client {
+        Some(client) => {
+            let _ = steam::store_stats(client);
+        }
+        None => {
+            println!("No Client Found");
+        }
+    }
+}
+
+#[tauri::command]
+fn cmd_load_statistics(app_handle: AppHandle, appid: u32) -> Vec<Stat> {
+    let state: State<AppState> = app_handle.state();
+    let client = state.client.lock().unwrap().clone();
+
+    match client {
+        Some(client) => steam::load_statistics(client, appid),
+        None => {
+            println!("No Client Found");
+            Vec::new()
+        }
+    }
+}
+
+#[tauri::command]
+fn cmd_commit_statistics(app_handle: AppHandle, name: String, value: i32) {
+    let state: State<AppState> = app_handle.state();
+    let client = state.client.lock().unwrap().clone();
+    match client {
+        Some(client) => {
+            let _ = steam::commit_statistics(client, name, value);
+        }
+        None => {
+            println!("No Client Found");
+        }
+    }
+}

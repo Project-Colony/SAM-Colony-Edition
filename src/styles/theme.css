@@ -1,0 +1,107 @@
+/* H&E parchment + burgundy palette, ported from client/scripts/ui_style.gd */
+
+@font-face {
+  font-family: "JetBrainsMono Nerd Font";
+  src: url("/fonts/JetBrainsMonoNerdFont-Light.ttf") format("truetype");
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "JetBrainsMono Nerd Font";
+  src: url("/fonts/JetBrainsMonoNerdFont-Regular.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "JetBrainsMono Nerd Font";
+  src: url("/fonts/JetBrainsMonoNerdFont-Italic.ttf") format("truetype");
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+@font-face {
+  font-family: "JetBrainsMono Nerd Font";
+  src: url("/fonts/JetBrainsMonoNerdFont-Medium.ttf") format("truetype");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "JetBrainsMono Nerd Font";
+  src: url("/fonts/JetBrainsMonoNerdFont-SemiBold.ttf") format("truetype");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "JetBrainsMono Nerd Font";
+  src: url("/fonts/JetBrainsMonoNerdFont-Bold.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "JetBrainsMono Nerd Font";
+  src: url("/fonts/JetBrainsMonoNerdFont-BoldItalic.ttf") format("truetype");
+  font-weight: 700;
+  font-style: italic;
+  font-display: swap;
+}
+
+:root {
+  /* Ink (text) ramp */
+  --ink: rgb(46, 26, 20);
+  --ink-dim: rgb(102, 66, 51);
+  --ink-very-dim: rgba(140, 107, 82, 0.95);
+
+  /* Burgundy accent */
+  --red: rgb(125, 35, 51);
+  --red-soft: rgba(125, 35, 51, 0.30);
+  --red-very-soft: rgba(125, 35, 51, 0.12);
+
+  /* Parchment surface ramp */
+  --parchment: rgb(255, 252, 242);
+  --parchment-hover: rgb(252, 239, 219);
+  --parchment-pressed: rgb(242, 225, 199);
+  --parchment-disabled: rgba(245, 240, 227, 0.6);
+  --parchment-soft: rgb(247, 237, 217);
+  --parchment-shadow: rgba(46, 26, 20, 0.08);
+
+  /* Typography - JetBrainsMono Nerd Font everywhere */
+  --font-display: "JetBrainsMono Nerd Font", monospace;
+  --font-body:    "JetBrainsMono Nerd Font", monospace;
+  --font-mono:    "JetBrainsMono Nerd Font", monospace;
+
+  /* Type scale */
+  --fs-xs:  10px;
+  --fs-sm:  11px;
+  --fs-md:  13px;
+  --fs-lg:  15px;
+  --fs-xl:  20px;
+  --fs-2xl: 26px;
+  --fs-3xl: 34px;
+
+  /* Weight scale */
+  --fw-light:    300;
+  --fw-regular:  400;
+  --fw-medium:   500;
+  --fw-semibold: 600;
+  --fw-bold:     700;
+
+  /* Letter spacing */
+  --tracking-tight:  -0.01em;
+  --tracking-normal:  0;
+  --tracking-wide:    0.06em;
+  --tracking-display: 0.14em;
+
+  /* Geometry */
+  --radius-input: 3px;
+  --radius-card: 4px;
+  --radius-panel: 6px;
+  --border-thin: 1px;
+  --border-panel: 2px;
+
+  color-scheme: light;
+}
