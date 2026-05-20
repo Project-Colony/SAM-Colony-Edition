@@ -5,7 +5,7 @@ use std::panic::{self, AssertUnwindSafe};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
-use steamworks::{Client, UserStatsReceived};
+use steamworks::{Client, SteamAPIInitError, UserStatsReceived};
 
 #[derive(Serialize, Deserialize)]
 pub struct Achievement {
@@ -40,11 +40,30 @@ impl Default for User {
 }
 
 pub fn start_client(appid: u32) -> Result<Client, String> {
+    // init_app returns a typed error. Translate the three variants into
+    // user-facing messages so the UI can tell apart "Steam not running" from
+    // "you don't own this game" instead of dumping a generic catch-all.
+    let client = match Client::init_app(appid) {
+        Ok(c) => c,
+        Err(SteamAPIInitError::NoSteamClient(_)) => {
+            return Err("Steam is not running. Start Steam and sign in, then try again.".to_string());
+        }
+        Err(SteamAPIInitError::VersionMismatch(_)) => {
+            return Err("Steam client is out of date. Update Steam and try again.".to_string());
+        }
+        Err(SteamAPIInitError::FailedGeneric(_)) => {
+            // FailedGeneric covers "user doesn't own this app", "appid not
+            // fully configured", and a few rarer conditions. In SAM the
+            // overwhelmingly likely cause is ownership.
+            return Err("You don't own this game (or it isn't activated on your Steam account).".to_string());
+        }
+    };
+
+    // The rest can still panic (steamworks-rs has rough edges on some games),
+    // so keep catch_unwind around stat-callback wiring.
     let result = panic::catch_unwind(AssertUnwindSafe(|| {
         let waiting = Arc::new(Mutex::new(true));
         let waiting_clone = Arc::clone(&waiting);
-
-        let client = Client::init_app(appid).expect("init_app failed");
 
         let user_stats = client.user_stats();
         let steam_user_id: u64 = client.user().steam_id().raw();
@@ -68,12 +87,11 @@ pub fn start_client(appid: u32) -> Result<Client, String> {
             }
         }
 
-        client
     }));
 
     match result {
-        Ok(client) => Ok(client),
-        Err(panic_error) => Err(format!("Panic occured: {:?}", panic_error)),
+        Ok(()) => Ok(client),
+        Err(panic_error) => Err(format!("Steam callback setup failed: {:?}", panic_error)),
     }
 }
 

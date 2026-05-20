@@ -5,7 +5,7 @@ export const cmd = {
   fetchGames: () => invoke<string>("cmd_fetch_games"),
   searchName: (query: string) => invoke<App[]>("cmd_search_name", { query }),
   requestAppName: (appid: number) => invoke<string>("cmd_request_app_name", { appid }),
-  startClient: (appid: number) => invoke<boolean>("cmd_start_client", { appid }),
+  startClient: (appid: number) => invoke<void>("cmd_start_client", { appid }),
   loadAchievements: () => invoke<Achievement[]>("cmd_load_achievements"),
   loadAchievementIcons: (appid: number) =>
     invoke<Record<string, string>>("cmd_load_achievement_icons", { appid }),

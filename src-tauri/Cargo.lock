@@ -2803,7 +2803,7 @@ dependencies = [
 
 [[package]]
 name = "samira"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "fuzzy-matcher",
  "reqwest 0.12.28",

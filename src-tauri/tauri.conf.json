@@ -27,7 +27,7 @@
   },
   "productName": "SAM-Colony-Edition",
   "mainBinaryName": "samira",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "identifier": "ai.projectcolony.sam",
   "plugins": {},
   "app": {

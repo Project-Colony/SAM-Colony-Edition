@@ -76,7 +76,7 @@ fn cmd_search_name(handle: AppHandle, query: String) -> Vec<Game> {
 }
 
 #[tauri::command]
-fn cmd_start_client(app_handle: AppHandle, appid: u32) -> bool {
+fn cmd_start_client(app_handle: AppHandle, appid: u32) -> Result<(), String> {
     let state: State<AppState> = app_handle.state();
     let c = state.client.lock().unwrap().take();
     drop(c);
@@ -84,12 +84,9 @@ fn cmd_start_client(app_handle: AppHandle, appid: u32) -> bool {
     match steam::start_client(appid) {
         Ok(client) => {
             *state.client.lock().unwrap() = Some(client);
-            true
+            Ok(())
         }
-        Err(e) => {
-            println!("Failed to start client: {}", e);
-            false
-        }
+        Err(e) => Err(e),
     }
 }
 

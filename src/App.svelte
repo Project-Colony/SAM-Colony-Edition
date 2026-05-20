@@ -66,13 +66,7 @@
   async function handleAppSelected(appid: number, name: string) {
     if (appid <= 0) return;
     try {
-      const ok = await cmd.startClient(appid);
-      if (!ok) {
-        pushStatus(
-          "Error loading client. Steam must be running and you must own the selected game."
-        );
-        return;
-      }
+      await cmd.startClient(appid);
       pushStatus("Starting client.");
       await Promise.all([
         loadStatistics(appid, true),
@@ -81,7 +75,9 @@
         updateUserInfo(appid, name),
       ]);
     } catch (err) {
-      pushStatus(`Start client failed: ${String(err)}`);
+      // Rust returns a user-facing reason: "You don't own this game...",
+      // "Steam is not running...", "Steam client is out of date...".
+      pushStatus(String(err));
     }
   }
 
