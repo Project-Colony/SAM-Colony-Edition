@@ -1,6 +1,7 @@
 {
   "name": "SAM - Colony Edition",
   "category": "Games",
+  "icon": "assets/icons/icon.png",
   "platforms": ["windows", "linux", "macos", "macos-x86"],
   "releaseFiles": {
     "windows": {
