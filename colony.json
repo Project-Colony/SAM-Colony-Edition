@@ -2,27 +2,28 @@
   "name": "SAM - Colony Edition",
   "category": "Games",
   "icon": "assets/icons/icon.png",
-  "platforms": ["windows", "linux", "macos", "macos-x86"],
+  "platforms": [
+    "windows",
+    "linux",
+    "macos",
+    "macos-x86"
+  ],
   "releaseFiles": {
     "windows": {
       "tag": "latest",
-      "file": "sam-colony-edition-windows.exe",
-      "binary": "sam-colony-edition-windows.exe"
+      "file": "sam-colony-edition-windows.exe"
     },
     "linux": {
       "tag": "latest",
-      "file": "sam-colony-edition-linux",
-      "binary": "sam-colony-edition-linux"
+      "file": "sam-colony-edition-linux"
     },
     "macos": {
       "tag": "latest",
-      "file": "sam-colony-edition-macos",
-      "binary": "sam-colony-edition-macos"
+      "file": "sam-colony-edition-macos"
     },
     "macos-x86": {
       "tag": "latest",
-      "file": "sam-colony-edition-macos-x86",
-      "binary": "sam-colony-edition-macos-x86"
+      "file": "sam-colony-edition-macos-x86"
     }
   }
 }
