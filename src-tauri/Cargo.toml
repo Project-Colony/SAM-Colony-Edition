@@ -4,6 +4,9 @@ version = "0.6.1"
 description = "Steam achievement manager for Linux"
 authors = ["you"]
 edition = "2021"
+# Derivative work of jsnli/Samira, which is GPL-3.0. Upstream ships the bare
+# GPLv3 text with no "or any later version" notice, so no "-or-later" is claimed.
+license = "GPL-3.0"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

@@ -2,6 +2,7 @@
   "name": "sam-colony-edition",
   "private": true,
   "version": "0.6.1",
+  "license": "GPL-3.0",
   "type": "module",
   "scripts": {
     "dev": "vite",

@@ -80,10 +80,22 @@ NO_STRIP=true npm run tauri build
 
 ## Credits
 
-- [jsnli/Samira](https://github.com/jsnli/Samira) — original implementation, the heavy lifting on VDF parsing and Steamworks integration.
+- [jsnli/Samira](https://github.com/jsnli/Samira) — the upstream this program is derived from, and the origin of most of what it still is. The VDF parser, the Steamworks integration, and the overall shape of the Rust backend are upstream's work, much of it unchanged here. Samira is GPL-3.0; this fork inherits those terms.
 - [Valve](https://partner.steamgames.com/) — Steamworks SDK (redistributed per [SDK License](https://partner.steamgames.com/documentation/sdk_access_agreement)).
 - [Project Colony](https://github.com/Project-Colony) — design language and distribution ecosystem.
 
 ## License
 
-MIT, matching upstream. See `LICENSE`.
+GPL-3.0. See `LICENSE`.
+
+This is a derivative work of [jsnli/Samira](https://github.com/jsnli/Samira), which is
+published under the GNU General Public License version 3. Substantial upstream code
+survives here verbatim, so that licence carries forward: this fork is GPL-3.0 and cannot
+be redistributed under anything more permissive. Earlier revisions of this README claimed
+"MIT, matching upstream", which was true of neither project.
+
+The SPDX identifier is the plain `GPL-3.0` rather than `GPL-3.0-or-later`. Upstream ships
+the bare GPLv3 text with no "or any later version" notice, and section 14 of that licence
+grants the option of following a later version only when the program itself says so.
+Declaring `-or-later` would assert a permission upstream never gave, so the
+version-neutral string is used instead.
