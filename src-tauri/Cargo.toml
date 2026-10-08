@@ -4,6 +4,8 @@ version = "0.7.0"
 description = "Steam achievement manager for Linux"
 authors = ["you"]
 edition = "2021"
+# The oldest toolchain the locked dependencies accept (plist, time); CI checks it.
+rust-version = "1.88"
 # Derivative work of jsnli/Samira, which is GPL-3.0. Upstream ships the bare
 # GPLv3 text with no "or any later version" notice, so no "-or-later" is claimed.
 license = "GPL-3.0"
