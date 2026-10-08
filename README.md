@@ -56,7 +56,7 @@ Steam installed via Flatpak is **not supported** — SAM reads from the Steam in
 ### Distribution
 - Single-file portable per platform (no installer wizards, no archives).
 - Steam runtime library embedded in the binary via `include_bytes!` and extracted on first launch (see `src-tauri/src/bootstrap.rs`). Lets us match Colony's single-asset download convention.
-- GitHub Actions matrix builds + automatic VirusTotal scan + SHA256SUMS per platform.
+- GitHub Actions matrix builds released through release-please; every asset is signed with the Project Colony release key (`.sig` plus a signed `.meta` sidecar) and scanned on VirusTotal.
 
 ---
 
