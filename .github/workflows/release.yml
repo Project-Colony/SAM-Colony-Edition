@@ -1,20 +1,130 @@
+# SAM - Colony Edition release workflow
+#
+# Follows the organisation contract (design/releases.md and
+# templates/release.yml in Project-Colony-Resources) and Colony's own release
+# workflow, whose central `sign` job this one copies:
+#
+#   conventional commits on main -> release-please keeps a release PR open
+#   merge that PR                -> tag vX.Y.Z + GitHub release, held as a draft
+#   build                        -> one asset per platform, uploaded to the draft
+#   sign                         -> .sig + .meta + .meta.sig per asset, verified,
+#                                   then the release is published
+#
+# Signing runs in its own job instead of on the build runners: those run
+# `npm ci` and the Tauri CLI, a large third-party dependency tree, and the
+# release key never shares a runner with it.
+#
+# Action refs are pinned to commit SHAs on purpose: this workflow handles the
+# organisation's release signing key, and whoever can move a floating tag can
+# read that secret.
+
 name: Release
 
 on:
   push:
-    tags: ["v*"]
+    branches: [main]
+  # Recovery path. release-please emits `release_created` only once per
+  # release, so a run that fails after the tag exists cannot be finished by
+  # "Re-run all jobs": release-please reports nothing to do and everything
+  # downstream skips while the run goes green. Dispatch with the tag instead.
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag (e.g. v0.6.0-alpha or nightly)"
+        description: "Existing draft release to build, sign and publish (e.g. v0.7.0)"
         required: true
-        default: "nightly"
+        type: string
 
-permissions:
-  contents: write
+permissions: {}
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  # Single source of truth for the release assets. colony.json names exactly
+  # these four files, so they must never change.
+  ASSETS: sam-colony-edition-linux sam-colony-edition-windows.exe sam-colony-edition-macos sam-colony-edition-macos-x86
 
 jobs:
+  release-please:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+    steps:
+      # No `release-type` input on purpose: when it is set, the action ignores
+      # both files below, and with them the extra-files that bump
+      # src-tauri/Cargo.toml and Cargo.lock.
+      - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
+        id: release
+        with:
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+      # release-please publishes the release, and moves /releases/latest,
+      # before a single binary exists. Colony would then offer an update whose
+      # install fails: a missing asset first, then a missing signature, which
+      # "signed": true in colony.json turns into a hard refusal. Held as a
+      # draft here; `sign` publishes it once everything is verified present.
+      #
+      # `-R` is not optional: there is no checkout in this job, so `gh` has no
+      # git remote to infer the repository from.
+      - name: Hold the release as a draft until it is signed
+        if: ${{ steps.release.outputs.release_created }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.release.outputs.tag_name }}
+        run: gh release edit "$TAG" -R "$GITHUB_REPOSITORY" --draft=true
+
+  # One place that answers "which tag are we building?" for both a merge and a
+  # recovery dispatch.
+  target:
+    name: Resolve the target release
+    needs: release-please
+    # `!cancelled() && !failure()` rather than `always()`: it still runs when
+    # release-please is SKIPPED (a dispatch) but not when it FAILED.
+    if: ${{ !cancelled() && !failure() && (needs.release-please.outputs.release_created || github.event_name == 'workflow_dispatch') }}
+    runs-on: ubuntu-latest
+    permissions:
+      # A draft release is invisible to a read-only token.
+      contents: write
+    outputs:
+      tag: ${{ steps.pick.outputs.tag }}
+    steps:
+      - id: pick
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FROM_RELEASE: ${{ needs.release-please.outputs.tag_name }}
+          FROM_DISPATCH: ${{ inputs.tag }}
+        run: |
+          tag="${FROM_RELEASE:-$FROM_DISPATCH}"
+          [ -n "$tag" ] || { echo "::error::no tag to build"; exit 1; }
+
+          # Refuse a release that is already visible. Uploading over its live
+          # binaries would leave the published .sig and .meta describing
+          # bytes that no longer exist, which breaks every install of it.
+          state=$(gh release view "$tag" -R "$GITHUB_REPOSITORY" --json isDraft --jq .isDraft) \
+            || { echo "::error::no release found for $tag"; exit 1; }
+          if [ "$state" != "true" ]; then
+            echo "::error::$tag is already published. Draft it first if you really mean to replace it: gh release edit $tag -R $GITHUB_REPOSITORY --draft=true"
+            exit 1
+          fi
+
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "building $tag (draft)"
+
   build:
+    name: Build ${{ matrix.target }}
+    needs: target
+    # `!cancelled()` suppresses the implicit `success()`, which would otherwise
+    # see the skipped release-please job on a dispatch and skip this one too.
+    if: ${{ !cancelled() && needs.target.result == 'success' }}
+    permissions:
+      contents: write
     strategy:
       fail-fast: false
       matrix:
@@ -37,7 +147,15 @@ jobs:
 
     runs-on: ${{ matrix.platform }}
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      # The tag, not the branch: on a recovery dispatch the default ref is
+      # whatever branch it was dispatched from, and the signed .meta binds
+      # these bytes to the tag's version.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.target.outputs.tag }}
+          # Keeps the write token out of .git/config, where every npm
+          # install script run below could read it.
+          persist-credentials: false
 
       - name: Linux deps
         if: startsWith(matrix.platform, 'ubuntu-')
@@ -50,16 +168,16 @@ jobs:
             patchelf \
             libsoup-3.0-dev
 
-      - uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable branch
+      - uses: dtolnay/rust-toolchain@89b12181fb390509a0842a86cc55eeb8eb928c1d # stable branch
         with:
           targets: ${{ matrix.target }}${{ matrix.extra_target && format(',{0}', matrix.extra_target) || '' }}
 
-      - uses: Swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           workspaces: "src-tauri -> target"
           key: ${{ matrix.target }}
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           node-version: 20
           cache: npm
@@ -84,85 +202,141 @@ jobs:
         env:
           NO_STRIP: "true"
 
-      # Stage exactly one self-contained executable per platform. The
-      # Steamworks runtime library is embedded in the binary at compile time
-      # by bootstrap.rs (see src-tauri/src/bootstrap.rs) and extracted to
-      # LOCALAPPDATA / Application Support on first launch.
+      # Stage exactly one self-contained executable per platform, under the
+      # names colony.json hardcodes. The Steamworks runtime library is
+      # embedded in the binary at compile time by bootstrap.rs and extracted
+      # to LOCALAPPDATA / Application Support / ~/.local/share on first launch.
+      # A missing source file fails the step: no platform is skipped silently.
       - name: Stage release artifacts
         shell: bash
         run: |
           mkdir -p staged
-          target_root="src-tauri/target/${{ matrix.target }}/release"
-          bundle_dir="${target_root}/bundle"
-
-          shopt -s nullglob
-
-          # Filenames stay static across releases so colony.json can hardcode
-          # them (matches the convention used by Spotter, Grape, etc.).
           case "${{ matrix.target }}" in
             *linux-gnu)
-              # Raw ELF binary. libsteam_api.so is embedded via
-              # include_bytes! in bootstrap.rs and extracted to
-              # ~/.local/share/SAM-Colony-Edition/ on first launch.
-              cp -v "$target_root/samira" "staged/sam-colony-edition-linux"
-              chmod +x "staged/sam-colony-edition-linux"
+              cp -v "src-tauri/target/${{ matrix.target }}/release/samira" staged/sam-colony-edition-linux
               ;;
             aarch64-apple-darwin)
-              # Raw Mach-O from each .app/Contents/MacOS/. The dylib is
-              # embedded via include_bytes! in bootstrap.rs (vendored dylib
-              # is a Mach-O universal binary containing both archs).
-              # macos-14 runner cross-compiles both Silicon and Intel here.
-              arm_app=$(find "src-tauri/target/aarch64-apple-darwin/release/bundle/macos" -maxdepth 1 -name "*.app" -type d | head -1)
-              if [ -n "$arm_app" ]; then
-                cp -v "$arm_app/Contents/MacOS/samira" "staged/sam-colony-edition-macos"
-                chmod +x "staged/sam-colony-edition-macos"
-              fi
-              x86_app=$(find "src-tauri/target/x86_64-apple-darwin/release/bundle/macos" -maxdepth 1 -name "*.app" -type d 2>/dev/null | head -1)
-              if [ -n "$x86_app" ]; then
-                cp -v "$x86_app/Contents/MacOS/samira" "staged/sam-colony-edition-macos-x86"
-                chmod +x "staged/sam-colony-edition-macos-x86"
-              fi
+              # Raw Mach-O from each .app/Contents/MacOS/.
+              cp -v src-tauri/target/aarch64-apple-darwin/release/bundle/macos/*.app/Contents/MacOS/samira staged/sam-colony-edition-macos
+              cp -v src-tauri/target/x86_64-apple-darwin/release/bundle/macos/*.app/Contents/MacOS/samira staged/sam-colony-edition-macos-x86
+              # The Intel binary is cross-compiled and cannot run here, so
+              # assert both architectures instead.
+              file staged/sam-colony-edition-macos | grep -q arm64 \
+                || { echo "::error::sam-colony-edition-macos is not an arm64 binary"; exit 1; }
+              file staged/sam-colony-edition-macos-x86 | grep -q x86_64 \
+                || { echo "::error::sam-colony-edition-macos-x86 is not an x86_64 binary"; exit 1; }
               ;;
             *windows-msvc)
-              # Single .exe. DLL embedded via include_bytes! in bootstrap.rs,
-              # extracted to %LOCALAPPDATA% on first launch.
-              cp -v "$target_root/samira.exe" "staged/sam-colony-edition-windows.exe"
+              cp -v "src-tauri/target/${{ matrix.target }}/release/samira.exe" staged/sam-colony-edition-windows.exe
               ;;
           esac
-
-          # Per-platform SHA256SUMS file so concurrent matrix uploads don't
-          # overwrite each other on the Release. Use the full target triple
-          # (with last component first for sort-friendliness) so the two
-          # macOS arches don't collide.
-          short="$(echo "${{ matrix.target }}" | tr '[:upper:]' '[:lower:]')"
-          if command -v sha256sum >/dev/null; then
-            (cd staged && sha256sum * > "SHA256SUMS-${short}.txt")
-          else
-            (cd staged && shasum -a 256 * > "SHA256SUMS-${short}.txt")
-          fi
-
+          chmod +x staged/*
           ls -la staged/
-          cat "staged/SHA256SUMS-${short}.txt"
 
-      - name: Upload to GitHub Release
-        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
+      # A manifest can parse perfectly and still leave SAM listed in Colony
+      # with no Download button, because no asset matches it. Linux only: one
+      # check per release is enough. No token reaches this step.
+      - name: Validate colony.json against the asset names
+        if: runner.os == 'Linux'
+        run: |
+          curl -fsSL -o colony-validator \
+            https://github.com/Project-Colony/Colony/releases/latest/download/colony-linux
+          chmod +x colony-validator
+          ./colony-validator validate-manifest colony.json $ASSETS
+          rm -f colony-validator
+
+      # `gh release upload` only ever adds assets, so it cannot publish the
+      # draft the way an uploader action that manages the release can.
+      - name: Upload to the draft release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.target.outputs.tag }}
+        run: gh release upload "$TAG" -R "$GITHUB_REPOSITORY" staged/* --clobber
+
+  # colony.json declares "signed": true, so Colony refuses any asset without a
+  # valid signature. This job fails the release rather than let an unsigned
+  # one become visible.
+  sign:
+    name: Sign and publish the release
+    needs: [target, build]
+    # Every dependency named: guarding on `target` alone would let this run
+    # after a failed build and sign whatever subset was uploaded.
+    if: ${{ !cancelled() && needs.target.result == 'success' && needs.build.result == 'success' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ needs.target.outputs.tag }}
+    steps:
+      # Same tag as the build, so the signing script is the one this release
+      # shipped with.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
-          name: ${{ github.event.inputs.tag || github.ref_name }}
-          draft: false
-          prerelease: ${{ github.event_name == 'workflow_dispatch' || !startsWith(github.ref, 'refs/tags/v') }}
-          generate_release_notes: ${{ startsWith(github.ref, 'refs/tags/v') }}
-          files: staged/*
-          fail_on_unmatched_files: true
+          ref: ${{ needs.target.outputs.tag }}
+          persist-credentials: false
+
+      - name: Download the release binaries
+        run: |
+          mkdir dist
+          for a in $ASSETS; do
+            gh release download "$TAG" -R "$GITHUB_REPOSITORY" --dir dist --pattern "$a"
+            [ -s "dist/$a" ] || { echo "::error::release asset $a is missing or empty"; exit 1; }
+          done
+
+      # scripts/sign-release.sh is the organisation's script: it writes
+      # <asset>.sig, plus <asset>.meta binding the bytes to this version and
+      # file name and its own .meta.sig, and self-verifies each signature.
+      - name: Sign
+        env:
+          KEY: ${{ secrets.COLONY_SIGNING_KEY_PEM }}
+        run: |
+          if [ -z "$KEY" ]; then
+            echo "::error::COLONY_SIGNING_KEY_PEM is not available - the release would ship unsigned and Colony would refuse it."
+            exit 1
+          fi
+          keyfile=$(mktemp)
+          # Removed even when signing fails, so the key never outlives the step.
+          trap 'rm -f "$keyfile"' EXIT
+          printf '%s' "$KEY" > "$keyfile"
+          cd dist
+          COLONY_SIGNING_KEY="$keyfile" COLONY_RELEASE_VERSION="$TAG" \
+            ../scripts/sign-release.sh $ASSETS
+
+      - name: Upload signatures and metadata
+        run: gh release upload "$TAG" -R "$GITHUB_REPOSITORY" dist/*.sig dist/*.meta --clobber
+
+      # Checked against the release itself, because a local file proves
+      # nothing about what users can download.
+      - name: Verify the release carries every asset and signature
+        run: |
+          gh release view "$TAG" -R "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' > published
+          for a in $ASSETS; do
+            for f in "$a" "$a.sig" "$a.meta" "$a.meta.sig"; do
+              grep -qx "$f" published \
+                || { echo "::error::$f is missing from $TAG - Colony would refuse this release"; exit 1; }
+            done
+          done
+          echo "release verified"
+
+      # Only now does /releases/latest move, so Colony never sees a release
+      # it cannot install.
+      - name: Publish the release
+        run: gh release edit "$TAG" -R "$GITHUB_REPOSITORY" --draft=false
 
   scan:
     name: VirusTotal scan
-    needs: build
+    needs: [target, sign]
+    if: ${{ !cancelled() && needs.sign.result == 'success' }}
     runs-on: ubuntu-latest
-    if: success()
+    permissions:
+      # Appends the scan links to the release notes.
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ needs.target.outputs.tag }}
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-
       - name: Check VT_API_KEY secret
         id: check
         env:
@@ -175,42 +349,31 @@ jobs:
             echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Resolve release tag
+      # The binaries only: the .sig and .meta companions are not worth a scan.
+      - name: Download release binaries
         if: steps.check.outputs.skip != 'true'
-        id: tag
-        run: |
-          tag="${{ github.event.inputs.tag || github.ref_name }}"
-          echo "tag=$tag" >> "$GITHUB_OUTPUT"
-
-      - name: Download release assets
-        if: steps.check.outputs.skip != 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p scan-assets
-          gh release download "${{ steps.tag.outputs.tag }}" \
-            --repo "${{ github.repository }}" \
-            --pattern 'sam-colony-edition-*' \
-            --dir scan-assets
+          for a in $ASSETS; do
+            gh release download "$TAG" -R "$GITHUB_REPOSITORY" --dir scan-assets --pattern "$a"
+          done
           ls -la scan-assets/
 
       - name: Upload to VirusTotal
         if: steps.check.outputs.skip != 'true'
         id: vt
-        uses: crazy-max/ghaction-virustotal@v4
+        uses: crazy-max/ghaction-virustotal@936d8c5c00afe97d3d9a1af26d017cfdf26800a2 # v5.0.0
         with:
           vt_api_key: ${{ secrets.VT_API_KEY }}
           files: |
-            scan-assets/sam-colony-edition-*
+            scan-assets/*
 
       - name: Append VT analysis links to release body
         if: steps.check.outputs.skip != 'true'
         env:
-          GH_TOKEN: ${{ github.token }}
           ANALYSIS: ${{ steps.vt.outputs.analysis }}
         run: |
-          tag="${{ steps.tag.outputs.tag }}"
-          existing=$(gh release view "$tag" --repo "${{ github.repository }}" --json body --jq .body)
+          existing=$(gh release view "$TAG" -R "$GITHUB_REPOSITORY" --json body --jq .body)
           {
             printf '%s\n\n' "$existing"
             echo "### VirusTotal scans"
@@ -221,48 +384,4 @@ jobs:
               printf -- '- [`%s`](%s)\n' "$(basename "$file")" "$url"
             done
           } > body.md
-          gh release edit "$tag" --repo "${{ github.repository }}" --notes-file body.md
-
-  # Sign every release asset with the Project-Colony org key (ed25519).
-  # Colony >= 0.8.0 verifies these signatures on install and REFUSES a
-  # tampered asset; the job fails the release if the secret is missing so
-  # an unsigned release cannot ship silently.
-  sign:
-    name: Sign release assets
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - name: Download release binaries
-        env:
-          GH_TOKEN: ${{ github.token }}
-          TAG: ${{ github.event.inputs.tag || github.ref_name }}
-        run: |
-          mkdir dist
-          gh release download "$TAG" -R "${{ github.repository }}" --dir dist
-          # Metadata companions are not signable assets.
-          rm -f dist/*.sig dist/*.sha256 dist/*.txt dist/*.yml dist/*.json dist/*.asc
-
-      - name: Sign
-        env:
-          KEY: ${{ secrets.COLONY_SIGNING_KEY_PEM }}
-        run: |
-          if [ -z "$KEY" ]; then
-            echo "::error::COLONY_SIGNING_KEY_PEM is not available - the release would ship unsigned."
-            exit 1
-          fi
-          printf '%s' "$KEY" > /tmp/key.pem
-          chmod 600 /tmp/key.pem
-          pub=$(mktemp)
-          openssl pkey -in /tmp/key.pem -pubout -out "$pub"
-          for f in dist/*; do
-            openssl pkeyutl -sign -inkey /tmp/key.pem -rawin -in "$f" -out "$f.sig"
-            openssl pkeyutl -verify -pubin -inkey "$pub" -rawin -in "$f" -sigfile "$f.sig" >/dev/null
-            echo "signed $(basename "$f")"
-          done
-          rm -f /tmp/key.pem
-
-      - name: Upload signatures
-        env:
-          GH_TOKEN: ${{ github.token }}
-          TAG: ${{ github.event.inputs.tag || github.ref_name }}
-        run: gh release upload "$TAG" dist/*.sig --clobber
+          gh release edit "$TAG" -R "$GITHUB_REPOSITORY" --notes-file body.md
