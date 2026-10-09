@@ -60,6 +60,10 @@ jobs:
       # before a release depends on them.
       - run: npm run build
       - run: cargo check --manifest-path src-tauri/Cargo.toml --target ${{ matrix.target }}
+      # The unit tests cover OS-independent logic, so one leg is enough.
+      - name: Unit tests
+        if: startsWith(matrix.platform, 'ubuntu-')
+        run: cargo test --locked --manifest-path src-tauri/Cargo.toml
 
   # rust-version in src-tauri/Cargo.toml is a promise about who can build SAM.
   # The check job only ever runs on stable, so this leg is what keeps it true.
