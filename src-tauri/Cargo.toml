@@ -21,7 +21,7 @@ reqwest = { version = "0.12.7", features = ["blocking", "json"] }
 serde = { version = "1.0.210", features = ["derive"] }
 serde_json = "1.0.128"
 tauri-plugin-shell = "2"
-steamworks = "0.12.0"
+steamworks = "0.13.1"
 fuzzy-matcher = "0.3"
 
 [target.'cfg(target_os = "windows")'.dependencies]
