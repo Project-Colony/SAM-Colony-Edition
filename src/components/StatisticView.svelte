@@ -64,7 +64,7 @@
             bind:value={items[idx]._draft}
           />
           <div class="stats__bounds dim">
-            {item.min} <span>—</span> {item.max}
+            {item.min} <span>-</span> {item.max}
           </div>
         </li>
       {/each}

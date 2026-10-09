@@ -116,7 +116,7 @@
   <main class="main">
     {#if info.app_id === 0}
       <div class="empty panel">
-        <div class="empty__eyebrow">SAM — Colony Edition</div>
+        <div class="empty__eyebrow">SAM - Colony Edition</div>
         <h2 class="title empty__title">Search for a game to begin</h2>
         <p class="muted">
           Steam must be running and signed in. Type a name (≥2 characters) or paste an App ID.
