@@ -21,7 +21,6 @@ fn main() {
     bootstrap::bootstrap();
 
     tauri::Builder::default()
-        .plugin(tauri_plugin_shell::init())
         .manage(AppState {
             data: Mutex::new(None),
             client: Mutex::new(None),

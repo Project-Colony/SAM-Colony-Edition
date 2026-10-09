@@ -1,0 +1,11 @@
+{
+  "identifier": "default",
+  "description": "Core defaults for the main window. The frontend only calls the app's own commands; Steam and network access stay in Rust.",
+  "local": true,
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    "core:default"
+  ]
+}
