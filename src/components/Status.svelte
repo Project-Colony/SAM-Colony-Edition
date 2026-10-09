@@ -17,7 +17,7 @@
 
   <div class="status__block">
     <div class="status__eyebrow">Game</div>
-    <div class="status__value">{info.app_name || "—"}</div>
+    <div class="status__value">{info.app_name || "-"}</div>
     <div class="status__sub dim">
       {info.app_id !== 0 ? `App ID ${info.app_id}` : ""}
     </div>
@@ -25,7 +25,7 @@
 
   <div class="status__block">
     <div class="status__eyebrow">User</div>
-    <div class="status__value">{info.user_name || "—"}</div>
+    <div class="status__value">{info.user_name || "-"}</div>
     <div class="status__sub dim">
       {info.user_id !== 0 ? `SteamID ${info.user_id}` : ""}
     </div>

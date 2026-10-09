@@ -2,7 +2,7 @@
 
 A Steam Achievement Manager for Linux, Windows, and macOS. Browse, unlock, and lock Steam achievements for any game in your library. Edit numeric statistics.
 
-Fork of [jsnli/Samira](https://github.com/jsnli/Samira) — rebuilt with the Project Colony design language, ported to Svelte 5, fixed several upstream Rust bugs that prevented achievements from loading on games with > 32 achievements, and made cross-platform.
+Fork of [jsnli/Samira](https://github.com/jsnli/Samira), rebuilt with the Project Colony design language, ported to Svelte 5, fixed several upstream Rust bugs that prevented achievements from loading on games with > 32 achievements, and made cross-platform.
 
 ---
 
@@ -25,11 +25,11 @@ Grab the single-file executable for your platform from the [latest release](http
 
 No installer. Single self-contained executable per platform.
 
-**Linux** — `chmod +x sam-colony-edition-linux && ./sam-colony-edition-linux`. The Steam runtime `.so` is embedded and unpacked to `~/.local/share/SAM-Colony-Edition/` on first launch.
+**Linux**: `chmod +x sam-colony-edition-linux && ./sam-colony-edition-linux`. The Steam runtime `.so` is embedded and unpacked to `~/.local/share/SAM-Colony-Edition/` on first launch.
 
-**Windows** — Double-click the `.exe`. The Steam runtime DLL is embedded and unpacked to `%LOCALAPPDATA%\SAM-Colony-Edition\` on first launch (visible there afterward).
+**Windows**: Double-click the `.exe`. The Steam runtime DLL is embedded and unpacked to `%LOCALAPPDATA%\SAM-Colony-Edition\` on first launch (visible there afterward).
 
-**macOS** — `chmod +x sam-colony-edition-macos`. On first launch macOS Gatekeeper will block because the binary is not signed by an Apple Developer account — bypass with `xattr -d com.apple.quarantine sam-colony-edition-macos` or right-click → Open → "Open Anyway" in Finder.
+**macOS**: `chmod +x sam-colony-edition-macos`. On first launch macOS Gatekeeper will block because the binary is not signed by an Apple Developer account. Bypass with `xattr -d com.apple.quarantine sam-colony-edition-macos` or right-click → Open → "Open Anyway" in Finder.
 
 ### Prerequisites
 
@@ -37,23 +37,23 @@ Steam must be running, you must be signed in, and you must own the game whose ac
 
 SAM reads achievement icons and statistics from the Steam install directory. It looks in the default place for each OS (the registry on Windows, `~/Library/Application Support/Steam` on macOS, `~/.steam/steam` or `~/.local/share/Steam` on Linux). If your Steam lives somewhere else, set `STEAM_ROOT` to the directory that holds `appcache/`.
 
-Steam installed via Flatpak is **not supported** — SAM reads from the Steam install dir on disk and Flatpak's sandboxing breaks that. Use your distro's native Steam package or the official installer from [steampowered.com](https://store.steampowered.com/about/).
+Steam installed via Flatpak is **not supported**: SAM reads from the Steam install dir on disk and Flatpak's sandboxing breaks that. Use your distro's native Steam package or the official installer from [steampowered.com](https://store.steampowered.com/about/).
 
 ---
 
 ## What changed vs upstream Samira
 
 ### Backend (Rust)
-- **CallbackHandle leak** — `client.register_callback(...)` was discarded immediately, unregistering the callback before Steam could fire `UserStatsReceived`. Fix: bind the handle to a named local for the duration of the wait loop. Without this fix, achievements load empty for most games.
-- **`break;` after first ACHIEVEMENTS block** — Steam splits >32 achievements across multiple bitfield blocks; the loop only read the first. Fix: iterate all blocks. Without this, big games (Elden Ring, Skyrim, etc.) lose half their achievement icons.
-- **`.unwrap()` panic-on-failure** — any transient Steam API hiccup crashed the load with `catch_unwind` returning `Vec::new()` and the UI showing "0/0". Fix: `.unwrap_or(false)` / `.unwrap_or_default()` for graceful degradation.
-- **Crash on zero-achievement games** — `get_achievement_names()` panics inside steamworks-rs when the game has no achievements. Fix: early-return on `get_num_achievements() == 0`.
-- **Cross-platform paths** — `steam_root()` resolves Windows registry / macOS Application Support / Linux `~/.steam/steam` instead of hardcoded Linux path.
+- **CallbackHandle leak**: `client.register_callback(...)` was discarded immediately, unregistering the callback before Steam could fire `UserStatsReceived`. Fix: bind the handle to a named local for the duration of the wait loop. Without this fix, achievements load empty for most games.
+- **`break;` after first ACHIEVEMENTS block**: Steam splits >32 achievements across multiple bitfield blocks; the loop only read the first. Fix: iterate all blocks. Without this, big games (Elden Ring, Skyrim, etc.) lose half their achievement icons.
+- **`.unwrap()` panic-on-failure**: any transient Steam API hiccup crashed the load with `catch_unwind` returning `Vec::new()` and the UI showing "0/0". Fix: `.unwrap_or(false)` / `.unwrap_or_default()` for graceful degradation.
+- **Crash on zero-achievement games**: `get_achievement_names()` panics inside steamworks-rs when the game has no achievements. Fix: early-return on `get_num_achievements() == 0`.
+- **Cross-platform paths**: `steam_root()` resolves Windows registry / macOS Application Support / Linux `~/.steam/steam` instead of hardcoded Linux path.
 
 ### Frontend
-- **React → Svelte 5** — smaller bundle, less re-render churn, runes for cleaner reactivity.
-- **H&E parchment theme** — replaces the dark Steam-style chrome with the Project Colony design language (parchment + burgundy + JetBrainsMono Nerd Font).
-- **CSS containment + lazy images** — smooth scrolling on long achievement lists.
+- **React → Svelte 5**: smaller bundle, less re-render churn, runes for cleaner reactivity.
+- **H&E parchment theme**: replaces the dark Steam-style chrome with the Project Colony design language (parchment + burgundy + JetBrainsMono Nerd Font).
+- **CSS containment + lazy images**: smooth scrolling on long achievement lists.
 
 ### Distribution
 - Single-file portable per platform (no installer wizards, no archives).
@@ -82,9 +82,9 @@ NO_STRIP=true npm run tauri build
 
 ## Credits
 
-- [jsnli/Samira](https://github.com/jsnli/Samira) — the upstream this program is derived from, and the origin of most of what it still is. The VDF parser, the Steamworks integration, and the overall shape of the Rust backend are upstream's work, much of it unchanged here. Samira is GPL-3.0; this fork inherits those terms.
-- [Valve](https://partner.steamgames.com/) — Steamworks SDK (redistributed per [SDK License](https://partner.steamgames.com/documentation/sdk_access_agreement)).
-- [Project Colony](https://github.com/Project-Colony) — design language and distribution ecosystem.
+- [jsnli/Samira](https://github.com/jsnli/Samira): the upstream this program is derived from, and the origin of most of what it still is. The VDF parser, the Steamworks integration, and the overall shape of the Rust backend are upstream's work, much of it unchanged here. Samira is GPL-3.0; this fork inherits those terms.
+- [Valve](https://partner.steamgames.com/): Steamworks SDK (redistributed per [SDK License](https://partner.steamgames.com/documentation/sdk_access_agreement)).
+- [Project Colony](https://github.com/Project-Colony): design language and distribution ecosystem.
 
 ## License
 
