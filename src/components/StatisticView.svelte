@@ -20,22 +20,29 @@
 
   async function apply() {
     const alerts: string[] = [];
+    let written = 0;
     for (const it of items) {
       if (it._draft === it.value || Number.isNaN(it._draft)) continue;
       try {
         await cmd.commitStatistic(it.api_name, it._draft);
+        written++;
         alerts.push(`${it.name || it.api_name} set to ${it._draft}`);
       } catch (err) {
         alerts.push(`Failed: ${it.api_name} (${String(err)})`);
       }
     }
-    try {
-      await cmd.storeStats();
-      onStatus(alerts.length > 0 ? alerts : "No statistic changes to commit");
-      onReload(false);
-    } catch (err) {
-      onStatus(`Store stats failed: ${String(err)}`);
+    // Upload only when Steam accepted a write: with nothing pending there is
+    // nothing for the server to confirm.
+    if (written > 0) {
+      try {
+        await cmd.storeStats();
+      } catch (err) {
+        alerts.unshift(`Store stats failed: ${String(err)}`);
+      }
     }
+    onStatus(alerts.length > 0 ? alerts : "No statistic changes to commit");
+    // Reload in every case: a rejected upload reverts Steam's local values.
+    onReload(false);
   }
 
   function reset() {

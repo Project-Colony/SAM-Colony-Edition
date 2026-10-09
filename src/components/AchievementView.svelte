@@ -81,24 +81,31 @@
 
   async function apply() {
     const alerts: string[] = [];
+    let written = 0;
     for (const it of items) {
       const original = achievements.find((a) => a.api_name === it.api_name);
       if (original && it.status !== original.status) {
         try {
           await cmd.commitAchievement(it.api_name, it.status);
+          written++;
           alerts.push(`${it.name} ${it.status ? "unlocked" : "locked"}`);
         } catch (err) {
           alerts.push(`Failed: ${it.name} (${String(err)})`);
         }
       }
     }
-    try {
-      await cmd.storeStats();
-      onStatus(alerts.length > 0 ? alerts : "No changes to commit");
-      onReload(false);
-    } catch (err) {
-      onStatus(`Store stats failed: ${String(err)}`);
+    // Upload only when Steam accepted a write: with nothing pending there is
+    // nothing for the server to confirm.
+    if (written > 0) {
+      try {
+        await cmd.storeStats();
+      } catch (err) {
+        alerts.unshift(`Store stats failed: ${String(err)}`);
+      }
     }
+    onStatus(alerts.length > 0 ? alerts : "No changes to commit");
+    // Reload in every case: a rejected upload reverts Steam's local values.
+    onReload(false);
   }
 
   let unlockedCount = $derived(items.filter((a) => a.status).length);
