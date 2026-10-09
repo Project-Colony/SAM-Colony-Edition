@@ -81,7 +81,11 @@ fn fetch_network() -> Result<Vec<Game>, Box<dyn std::error::Error>> {
     let url = "https://raw.githubusercontent.com/jsnli/steamappidlist/master/data/games_appid.json";
     let client = Client::builder()
         .timeout(Duration::from_secs(15))
-        .user_agent("steam-fetch/0.1 (+https://github.com/jsnli)")
+        .user_agent(concat!(
+            "sam-colony-edition/",
+            env!("CARGO_PKG_VERSION"),
+            " (+https://github.com/Project-Colony/SAM-Colony-Edition)"
+        ))
         .build()?;
     let resp = client.get(url).send()?;
     if !resp.status().is_success() {

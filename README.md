@@ -35,6 +35,8 @@ No installer. Single self-contained executable per platform.
 
 Steam must be running, you must be signed in, and you must own the game whose achievements you want to manage.
 
+SAM reads achievement icons and statistics from the Steam install directory. It looks in the default place for each OS (the registry on Windows, `~/Library/Application Support/Steam` on macOS, `~/.steam/steam` or `~/.local/share/Steam` on Linux). If your Steam lives somewhere else, set `STEAM_ROOT` to the directory that holds `appcache/`.
+
 Steam installed via Flatpak is **not supported** — SAM reads from the Steam install dir on disk and Flatpak's sandboxing breaks that. Use your distro's native Steam package or the official installer from [steampowered.com](https://store.steampowered.com/about/).
 
 ---
