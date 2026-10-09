@@ -5,7 +5,7 @@ use std::panic::{self, AssertUnwindSafe};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
-use steamworks::{Client, SteamAPIInitError, UserStatsReceived};
+use steamworks::{Client, SteamAPIInitError, SteamError, UserStatsReceived, UserStatsStored};
 
 #[derive(Serialize, Deserialize)]
 pub struct Achievement {
@@ -203,22 +203,49 @@ pub fn load_achievement_icons(appid: u32) -> HashMap<String, String> {
     paths
 }
 
-pub fn commit_achievement(client: Client, name: String, unlocked: bool) {
+pub fn commit_achievement(client: Client, name: String, unlocked: bool) -> Result<(), String> {
     let user_stats = client.user_stats();
     let achievement = user_stats.achievement(&name);
-    if unlocked {
-        let _ = achievement.set();
-    } else {
-        let _ = achievement.clear();
+    let written = if unlocked { achievement.set() } else { achievement.clear() };
+    // Steam refuses unknown names and writes made before the stats arrived.
+    written.map_err(|()| "Steam refused the change".to_string())
+}
+
+/// Uploads the pending achievement and stat writes and waits for Steam's verdict.
+///
+/// `StoreStats` only queues the upload. The server answers with
+/// `UserStatsStored`, whose result says whether it kept the values or
+/// rejected them (a stat outside its bounds, an achievement the game only
+/// lets its own servers set), so wait for that before reporting success.
+pub fn store_stats(client: Client) -> Result<(), String> {
+    let stored: Arc<Mutex<Option<Result<(), SteamError>>>> = Arc::default();
+    let stored_clone = Arc::clone(&stored);
+    // Bound to a named local: dropping the handle unregisters the callback.
+    let _stored_cb = client.register_callback(move |data: UserStatsStored| {
+        *stored_clone.lock().unwrap() = Some(data.result);
+    });
+
+    client
+        .user_stats()
+        .store_stats()
+        .map_err(|()| "Steam refused to upload the changes".to_string())?;
+
+    // Same 5 s budget as the stats request in start_client.
+    for _ in 0..50 {
+        client.run_callbacks();
+        if let Some(result) = stored.lock().unwrap().take() {
+            return result.map_err(|e| format!("Steam rejected the changes: {e}"));
+        }
+        ::std::thread::sleep(::std::time::Duration::from_millis(100));
     }
+    Err("Steam did not confirm the upload within 5 seconds. Refresh to see what was saved.".to_string())
 }
 
-pub fn store_stats(client: Client) {
-    let user_stats = client.user_stats();
-    let _ = user_stats.store_stats();
-}
-
-/// Returns the first existing Steam install root for the current OS, or None.
+/// Returns the Steam install root, or None.
+///
+/// A non-empty `STEAM_ROOT` environment variable wins, for installs outside
+/// the default locations. Otherwise the first existing default for the
+/// current OS:
 ///
 /// - Windows: `HKCU\Software\Valve\Steam!SteamPath` (registry) then the
 ///   common `C:\Program Files (x86)\Steam` fallback.
@@ -226,6 +253,10 @@ pub fn store_stats(client: Client) {
 /// - Linux: `~/.steam/steam` then `~/.local/share/Steam` (Flatpak-free
 ///   installs use one or the other depending on distro).
 pub fn steam_root() -> Option<PathBuf> {
+    if let Some(root) = std::env::var_os("STEAM_ROOT").filter(|v| !v.is_empty()) {
+        return Some(PathBuf::from(root));
+    }
+
     #[cfg(target_os = "windows")]
     {
         if let Some(p) = windows_steam_root() {
@@ -317,7 +348,28 @@ pub fn load_statistics(client: Client, appid: u32) -> Vec<Stat> {
         .collect()
 }
 
-pub fn commit_statistics(client: Client, name: String, value: i32) {
+pub fn commit_statistics(client: Client, name: String, value: i32) -> Result<(), String> {
     let user_stats = client.user_stats();
-    let _ = user_stats.set_stat_i32(&name, value);
+    // Steam refuses unknown names, non-integer stats and writes made before
+    // the stats arrived.
+    user_stats
+        .set_stat_i32(&name, value)
+        .map_err(|()| "Steam refused the new value".to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn steam_root_prefers_steam_root_env() {
+        // One test owns STEAM_ROOT so parallel tests never race on it.
+        let custom = std::env::temp_dir().join("sam-steam-root-test");
+        std::env::set_var("STEAM_ROOT", &custom);
+        assert_eq!(super::steam_root(), Some(custom));
+
+        // An empty value is treated as unset and falls back to the defaults.
+        std::env::set_var("STEAM_ROOT", "");
+        assert_ne!(super::steam_root(), Some(std::path::PathBuf::new()));
+
+        std::env::remove_var("STEAM_ROOT");
+    }
 }
