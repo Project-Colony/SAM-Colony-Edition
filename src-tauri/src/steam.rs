@@ -69,7 +69,7 @@ pub fn start_client(appid: u32) -> Result<Client, String> {
         let steam_user_id: u64 = client.user().steam_id().raw();
 
         // IMPORTANT: bind the CallbackHandle to a named local. Dropping it
-        // immediately unregisters the callback (steamworks 0.12 Drop impl).
+        // immediately unregisters the callback (steamworks 0.13 Drop impl).
         let _stats_cb = client.register_callback(move |_data: UserStatsReceived| {
             let mut waiting = waiting_clone.lock().unwrap();
             *waiting = false;
