@@ -5,6 +5,7 @@
 mod bootstrap;
 mod commands;
 mod dataset;
+mod paths;
 mod state;
 mod steam;
 mod vdf;
@@ -35,7 +36,21 @@ fn main() {
             commands::cmd_commit_statistics,
             commands::cmd_retrieve_user,
         ])
-        .setup(|_app| {
+        .setup(|app| {
+            // Built here rather than in tauri.conf.json so the WebView keeps its
+            // data under Colony/SAM instead of a directory named after the
+            // bundle identifier. WKWebView ignores data_directory, so on macOS
+            // it stays where the system puts it.
+            let mut window = tauri::WebviewWindowBuilder::new(app, "main", tauri::WebviewUrl::default())
+                .title("SAM - Colony Edition")
+                .inner_size(1280.0, 720.0)
+                .min_inner_size(960.0, 600.0)
+                .use_https_scheme(true);
+            match paths::data_dir(paths::PROGRAM) {
+                Ok(dir) => window = window.data_directory(dir.join("webview")),
+                Err(e) => eprintln!("[setup] no data directory, the WebView uses its default: {e}"),
+            }
+            window.build()?;
             Ok(())
         })
         .run(tauri::generate_context!())

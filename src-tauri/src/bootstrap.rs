@@ -10,14 +10,15 @@
 //! time (`include_bytes!`) and extract it to a stable user-writable
 //! location on first launch. Subsequent runs reuse the cached copy.
 //!
+//! The copy is re-derivable, so it lives in SAM's Colony cache directory
+//! (`paths::cache_dir`): `~/.cache/Colony/SAM/` on Linux,
+//! `%LOCALAPPDATA%\Colony\SAM\cache\` on Windows and
+//! `~/Library/Caches/Colony/SAM/` on macOS. Nothing touches `%TEMP%`,
+//! system32, or anything that would look suspicious to anti-virus heuristics.
+//!
 //! Each SAM version extracts into its own `steamworks/<version>/` directory
 //! (see `extract`), so an upgrade never rewrites a library that an older SAM,
 //! still running, has loaded.
-//!
-//! All extraction targets `%LOCALAPPDATA%` (Windows) or `~/Library/
-//! Application Support` (macOS) - standard user-writable app data
-//! directories. Nothing touches `%TEMP%`, system32, or anything that
-//! would look suspicious to anti-virus heuristics.
 
 #[cfg(target_os = "windows")]
 pub fn bootstrap() {
@@ -26,12 +27,7 @@ pub fn bootstrap() {
     const DLL_BYTES: &[u8] = include_bytes!("../vendor/steam_api64.dll");
     const DLL_NAME: &str = "steam_api64.dll";
 
-    let Some(local_appdata) = std::env::var_os("LOCALAPPDATA") else {
-        eprintln!("[bootstrap] LOCALAPPDATA not set, skipping DLL bootstrap");
-        return;
-    };
-    let base = std::path::PathBuf::from(local_appdata).join("SAM-Colony-Edition");
-    let Some(dir) = extract(base, DLL_NAME, DLL_BYTES) else {
+    let Some(dir) = cache_base().and_then(|base| extract(base, DLL_NAME, DLL_BYTES)) else {
         return;
     };
 
@@ -61,13 +57,7 @@ pub fn bootstrap() {
         return;
     }
 
-    let Some(home) = std::env::var_os("HOME") else {
-        eprintln!("[bootstrap] HOME not set, skipping dylib bootstrap");
-        return;
-    };
-    let base =
-        std::path::PathBuf::from(home).join("Library/Application Support/SAM-Colony-Edition");
-    let Some(dir) = extract(base, DYLIB_NAME, DYLIB_BYTES) else {
+    let Some(dir) = cache_base().and_then(|base| extract(base, DYLIB_NAME, DYLIB_BYTES)) else {
         return;
     };
 
@@ -102,17 +92,7 @@ pub fn bootstrap() {
         return;
     }
 
-    // Prefer XDG_DATA_HOME, fall back to ~/.local/share (XDG default).
-    let dir = std::env::var_os("XDG_DATA_HOME")
-        .map(std::path::PathBuf::from)
-        .or_else(|| {
-            std::env::var_os("HOME").map(|h| std::path::PathBuf::from(h).join(".local/share"))
-        });
-    let Some(dir) = dir else {
-        eprintln!("[bootstrap] neither XDG_DATA_HOME nor HOME set, skipping .so bootstrap");
-        return;
-    };
-    let Some(dir) = extract(dir.join("SAM-Colony-Edition"), SO_NAME, SO_BYTES) else {
+    let Some(dir) = cache_base().and_then(|base| extract(base, SO_NAME, SO_BYTES)) else {
         return;
     };
 
@@ -144,6 +124,13 @@ pub fn bootstrap() {
     std::process::exit(1);
 }
 
+/// SAM's cache directory, or None (logged) when the platform has none.
+fn cache_base() -> Option<std::path::PathBuf> {
+    crate::paths::locate::cache_dir(crate::paths::PROGRAM)
+        .map_err(|e| eprintln!("[bootstrap] no cache directory, skipping: {e}"))
+        .ok()
+}
+
 /// Extracts `bytes` as `name` into `base/steamworks/<SAM version>/` and
 /// returns that directory, or logs why it could not and returns None.
 ///
@@ -153,11 +140,11 @@ pub fn bootstrap() {
 /// and leaves the new process without its DLL. The write goes through a
 /// temporary file and a rename, so a process loading the library never sees
 /// a half-written file and, on Unix, an older mapping keeps its own inode.
-// ponytail: copies left by older versions (and the one that releases before
-// this layout put directly in `base`) are never pruned, a few hundred KB per
-// release. Prune them at startup if that ever matters; on Windows a copy can
-// be in use by a running SAM that has not delay-loaded it yet, so pruning
-// must tolerate that.
+// ponytail: copies left by older versions are never pruned, a few hundred KB
+// per release, and neither are the ones older releases put under
+// <data or LocalAppData>/SAM-Colony-Edition/. Prune them at startup if that
+// ever matters; on Windows a copy can be in use by a running SAM that has not
+// delay-loaded it yet, so pruning must tolerate that.
 fn extract(base: std::path::PathBuf, name: &str, bytes: &[u8]) -> Option<std::path::PathBuf> {
     let dir = base.join("steamworks").join(env!("CARGO_PKG_VERSION"));
     if let Err(e) = std::fs::create_dir_all(&dir) {

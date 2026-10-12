@@ -1,6 +1,7 @@
 use reqwest::blocking::Client;
 use std::time::Duration;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use crate::paths;
 use std::time::SystemTime;
 use serde::{Serialize, Deserialize};
 
@@ -37,32 +38,26 @@ pub fn fetch_games() -> Result<(Vec<Game>, String), Box<dyn std::error::Error>> 
 }
 
 fn get_cache_path() -> Result<PathBuf, Box<dyn std::error::Error>> {
-    // Per-OS user cache directory. HOME doesn't exist on Windows, which is
-    // why this used to crash with "environment variable not found" the
-    // moment Colony launched the binary on a Windows machine.
-    #[cfg(target_os = "windows")]
-    let base = std::env::var_os("LOCALAPPDATA")
-        .or_else(|| std::env::var_os("APPDATA"))
-        .ok_or("neither LOCALAPPDATA nor APPDATA is set")?;
+    let path = paths::cache_dir(paths::PROGRAM)?.join("cache.json");
+    if let Some(root) = dirs::cache_dir() {
+        migrate_legacy_cache(&root.join("SAM-Colony-Edition").join("cache.json"), &path);
+    }
+    Ok(path)
+}
 
-    #[cfg(target_os = "macos")]
-    let base = {
-        let home = std::env::var_os("HOME").ok_or("HOME is not set")?;
-        PathBuf::from(home).join("Library/Caches").into_os_string()
-    };
-
-    #[cfg(all(unix, not(target_os = "macos")))]
-    let base = match std::env::var_os("XDG_CACHE_HOME") {
-        Some(p) => p,
-        None => {
-            let home = std::env::var_os("HOME").ok_or("HOME is not set")?;
-            PathBuf::from(home).join(".cache").into_os_string()
-        }
-    };
-
-    let dir = PathBuf::from(base).join("SAM-Colony-Edition");
-    std::fs::create_dir_all(&dir)?;
-    Ok(dir.join("cache.json"))
+/// Moves the games list from where releases before the Colony layout kept it,
+/// `<cache root>/SAM-Colony-Edition/cache.json`, when the new copy is missing.
+///
+/// A rename keeps the file's age, so freshness is judged as before. If it
+/// fails (another volume, a locked file), the copy is the fallback and the old
+/// file stays; a failed copy just means the list is downloaded again.
+// ponytail: the legacy SAM-Colony-Edition/ directory is never deleted here, as
+// filesystem.md requires for the release that adds the move. Prune it in a
+// later release.
+fn migrate_legacy_cache(legacy: &Path, path: &Path) {
+    if !path.exists() && legacy.exists() && std::fs::rename(legacy, path).is_err() {
+        let _ = std::fs::copy(legacy, path);
+    }
 }
 
 fn cache_is_fresh(path: &PathBuf) -> bool {
@@ -131,3 +126,24 @@ pub fn fuzzy_search(games: &[Game], query: &str, limit: usize) -> Vec<Game> {
 
 }
 
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn the_legacy_cache_moves_only_when_the_new_one_is_missing() {
+        let dir = std::env::temp_dir().join(format!("sam-cache-migration-{}", std::process::id()));
+        std::fs::create_dir_all(dir.join("old")).unwrap();
+        let (legacy, path) = (dir.join("old/cache.json"), dir.join("cache.json"));
+
+        std::fs::write(&legacy, "[1]").unwrap();
+        super::migrate_legacy_cache(&legacy, &path);
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), "[1]");
+        assert!(!legacy.exists(), "a rename leaves no copy behind");
+
+        // An existing new cache is never overwritten by a legacy one.
+        std::fs::write(&legacy, "[2]").unwrap();
+        super::migrate_legacy_cache(&legacy, &path);
+        assert_eq!(std::fs::read_to_string(&path).unwrap(), "[1]");
+
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+}
