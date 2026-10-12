@@ -1,103 +1,233 @@
-# SAM - Colony Edition
+<div align="center">
 
-A Steam Achievement Manager for Linux, Windows, and macOS. Browse, unlock, and lock Steam achievements for any game in your library. Edit numeric statistics.
+**A Steam achievement manager for Linux, Windows and macOS: unlock, lock and edit the achievements and statistics of the games you own.**
 
-Fork of [jsnli/Samira](https://github.com/jsnli/Samira), rebuilt with the Project Colony design language, ported to Svelte 5, fixed several upstream Rust bugs that prevented achievements from loading on games with > 32 achievements, and made cross-platform.
+</div>
 
----
+[![License: GPL-3.0](https://img.shields.io/badge/License-GPL--3.0-blue.svg)](LICENSE)
+[![Colony app](https://img.shields.io/badge/Colony-game-purple)](https://github.com/Project-Colony/Colony)
+[![Platforms](https://img.shields.io/badge/platforms-linux%20%7C%20windows%20%7C%20macOS-lightgrey)](#installation)
 
-## Install
+Steam has no way to take back an achievement a bug unlocked, or to grant one a
+broken game never awards. The classic Steam Achievement Manager runs on Windows
+only, and Samira, the Linux manager this is forked from, loads no achievements
+at all for most games. SAM - Colony Edition does the job on all three desktops,
+from one self-contained executable that talks to the Steam client you are
+already signed in to.
+
+> **Status:** releases are built in CI and every asset is signed with the
+> Project Colony release key since v0.7.0. CI builds the frontend and checks the
+> Rust code on Linux, Windows and macOS, and runs the unit tests on Linux. There
+> are only a few unit tests and no UI tests, so achievement and statistic writes
+> against a live Steam client are tested by hand. Known gap: the Linux and macOS
+> executables need Valve's `libsteam_api` on the system library path when they
+> start, before SAM can extract its embedded copy, so on most machines they do
+> not start. The Windows executable loads the library later and is not affected.
+> The macOS executables are not signed by an Apple Developer account, and Steam
+> installed through Flatpak is not supported.
+
+## Why SAM
+
+- **[Steam Achievement Manager](https://github.com/gibbed/SteamAchievementManager)**
+  is the original, and it is Windows only.
+- **[Samira](https://github.com/jsnli/Samira)**, which this is a fork of, brings
+  the idea to Linux, but loads no achievements for most games and no icons past the
+  first 32 achievements (see [What changed from upstream](#what-changed-from-upstream)).
+- **SAM - Colony Edition** runs on Linux, Windows and macOS, ships as a single
+  executable per platform with no installer, and installs and updates through
+  [Colony](https://github.com/Project-Colony/Colony), which checks every
+  download's signature first.
+
+## What it does
+
+- **Find a game** by name or App ID. The search is fuzzy, over the list of every
+  Steam app, and an App ID that is not in the list can still be opened.
+- **Achievements:** every achievement of the game with its icon and its state.
+  Filter by name or description, show only the locked or the unlocked ones,
+  select or deselect them all, then apply the changes in one upload.
+- **Statistics:** the game's integer statistics, each with its allowed range,
+  edited in place and applied in one upload.
+- **Steam's verdict, not a guess:** after an upload SAM waits for Steam to
+  confirm it, reports what Steam rejected, and reloads the real values.
+- Shows the game's header art and the Steam account in use.
+
+## What changed from upstream
+
+- **Achievements load on every game.** Upstream dropped the Steam callback
+  handle at once, so the stats never arrived, and read the icons of the first
+  block of 32 achievements only.
+- **No crash on games without achievements**, and transient Steamworks errors
+  no longer empty the list.
+- **Linux, Windows and macOS**, with the Steam install found per platform.
+- **Svelte 5 instead of React**, with a light parchment and burgundy theme and
+  smooth scrolling on long lists.
+- **One executable per platform:** the Steam runtime library is embedded in the
+  binary and extracted on first launch (`src-tauri/src/bootstrap.rs`).
+
+## Installation
+
+SAM needs Steam running and signed in, and you must own the game whose
+achievements you change. It reads achievement and statistic schemas from the
+Steam install: the registry on Windows, `~/Library/Application Support/Steam` on
+macOS, `~/.steam/steam` or `~/.local/share/Steam` on Linux. If Steam lives
+anywhere else, set `STEAM_ROOT` to the directory that holds `appcache/`. Steam
+installed through Flatpak is not supported: its sandbox keeps SAM out of the
+Steam install.
 
 ### Via Colony (recommended)
 
-The easiest path. [Install Colony](https://github.com/Project-Colony/Colony#installation), then find **SAM - Colony Edition** in the app grid and click Install. Updates happen in-app.
+Search for **SAM - Colony Edition** in
+[Colony](https://github.com/Project-Colony/Colony) and install it. Updates
+arrive through the launcher.
 
-### Direct download
+### Direct binary download
 
-Grab the single-file executable for your platform from the [latest release](https://github.com/Project-Colony/SAM-Colony-Edition/releases/latest):
+Grab the asset for your platform from the
+[latest release](../../releases/latest):
 
-| Platform               | Asset                                |
-|------------------------|--------------------------------------|
-| Linux (x86_64)         | `sam-colony-edition-linux`           |
-| Windows (x86_64)       | `sam-colony-edition-windows.exe`     |
-| macOS (Apple Silicon)  | `sam-colony-edition-macos`           |
-| macOS (Intel)          | `sam-colony-edition-macos-x86`       |
+| Platform | Asset |
+|---|---|
+| Linux | `sam-colony-edition-linux` |
+| Windows | `sam-colony-edition-windows.exe` |
+| macOS (Apple Silicon) | `sam-colony-edition-macos` |
+| macOS (Intel) | `sam-colony-edition-macos-x86` |
 
-No installer. Single self-contained executable per platform.
+```bash
+chmod +x sam-colony-edition-linux && ./sam-colony-edition-linux
+```
 
-**Linux**: `chmod +x sam-colony-edition-linux && ./sam-colony-edition-linux`. The Steam runtime `.so` is embedded and unpacked to `~/.local/share/SAM-Colony-Edition/` on first launch.
+On first launch each version extracts Valve's Steam runtime library into
+`steamworks/<version>/` under:
 
-**Windows**: Double-click the `.exe`. The Steam runtime DLL is embedded and unpacked to `%LOCALAPPDATA%\SAM-Colony-Edition\` on first launch (visible there afterward).
+| Platform | Directory |
+|---|---|
+| Linux | `$XDG_DATA_HOME/SAM-Colony-Edition/`, by default `~/.local/share/SAM-Colony-Edition/` |
+| Windows | `%LOCALAPPDATA%\SAM-Colony-Edition\` |
+| macOS | `~/Library/Application Support/SAM-Colony-Edition/` |
 
-**macOS**: `chmod +x sam-colony-edition-macos`. On first launch macOS Gatekeeper will block because the binary is not signed by an Apple Developer account. Bypass with `xattr -d com.apple.quarantine sam-colony-edition-macos` or right-click → Open → "Open Anyway" in Finder.
+The Windows executable has no Authenticode signature, so SmartScreen may warn
+the first time. On macOS, Gatekeeper blocks the binary because Apple has not
+signed it: run `xattr -d com.apple.quarantine sam-colony-edition-macos`, or
+right-click it in Finder and choose Open.
 
-### Prerequisites
-
-Steam must be running, you must be signed in, and you must own the game whose achievements you want to manage.
-
-SAM reads achievement icons and statistics from the Steam install directory. It looks in the default place for each OS (the registry on Windows, `~/Library/Application Support/Steam` on macOS, `~/.steam/steam` or `~/.local/share/Steam` on Linux). If your Steam lives somewhere else, set `STEAM_ROOT` to the directory that holds `appcache/`.
-
-Steam installed via Flatpak is **not supported**: SAM reads from the Steam install dir on disk and Flatpak's sandboxing breaks that. Use your distro's native Steam package or the official installer from [steampowered.com](https://store.steampowered.com/about/).
-
----
-
-## What changed vs upstream Samira
-
-### Backend (Rust)
-- **CallbackHandle leak**: `client.register_callback(...)` was discarded immediately, unregistering the callback before Steam could fire `UserStatsReceived`. Fix: bind the handle to a named local for the duration of the wait loop. Without this fix, achievements load empty for most games.
-- **`break;` after first ACHIEVEMENTS block**: Steam splits >32 achievements across multiple bitfield blocks; the loop only read the first. Fix: iterate all blocks. Without this, big games (Elden Ring, Skyrim, etc.) lose half their achievement icons.
-- **`.unwrap()` panic-on-failure**: any transient Steam API hiccup crashed the load with `catch_unwind` returning `Vec::new()` and the UI showing "0/0". Fix: `.unwrap_or(false)` / `.unwrap_or_default()` for graceful degradation.
-- **Crash on zero-achievement games**: `get_achievement_names()` panics inside steamworks-rs when the game has no achievements. Fix: early-return on `get_num_achievements() == 0`.
-- **Cross-platform paths**: `steam_root()` resolves Windows registry / macOS Application Support / Linux `~/.steam/steam` instead of hardcoded Linux path.
-
-### Frontend
-- **React → Svelte 5**: smaller bundle, less re-render churn, runes for cleaner reactivity.
-- **H&E parchment theme**: replaces the dark Steam-style chrome with the Project Colony design language (parchment + burgundy + JetBrainsMono Nerd Font).
-- **CSS containment + lazy images**: smooth scrolling on long achievement lists.
-
-### Distribution
-- Single-file portable per platform (no installer wizards, no archives).
-- Steam runtime library embedded in the binary via `include_bytes!` and extracted on first launch (see `src-tauri/src/bootstrap.rs`). Lets us match Colony's single-asset download convention.
-- GitHub Actions matrix builds released through release-please; every asset is signed with the Project Colony release key (`.sig` plus a signed `.meta` sidecar) and scanned on VirusTotal.
-
----
-
-## Build from source
+### Build from source
 
 ```bash
 git clone https://github.com/Project-Colony/SAM-Colony-Edition.git
 cd SAM-Colony-Edition
-npm install
-npm run tauri build
+npm ci
+npm run tauri build -- --no-bundle
 ```
 
-Requires Rust 1.80+, Node 20+, and the [Tauri prerequisites](https://tauri.app/start/prerequisites/) for your OS.
+The executable is `src-tauri/target/release/samira` (`samira.exe` on Windows).
+`npm run tauri dev` runs SAM from source with live reload.
 
-On Arch Linux a strip workaround is needed:
+Requires Rust 1.88 or newer, the current Node LTS, and the
+[Tauri prerequisites](https://tauri.app/start/prerequisites/) for your OS. On
+Debian and Ubuntu:
+
 ```bash
-NO_STRIP=true npm run tauri build
+sudo apt install libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libsoup-3.0-dev
 ```
 
----
+## Documentation
+
+This README is the documentation for now; there is no `docs/` directory yet.
+The source explains the parts that are not obvious, starting with the Steam
+runtime extraction in `src-tauri/src/bootstrap.rs`. How Project Colony programs
+are released and signed:
+[design/releases.md](https://github.com/Project-Colony/Project-Colony-Resources/blob/main/design/releases.md).
+
+## Code signing policy
+
+Every release asset is signed by the Project Colony organisation in CI, never on
+a developer machine. Next to each asset on the release page:
+
+| File | What it is |
+|---|---|
+| `<asset>.sig` | an ed25519 signature over the asset, made with the organisation's release key |
+| `<asset>.meta` | three lines binding the asset to its file name, its sha256 and the release version |
+| `<asset>.meta.sig` | an ed25519 signature over the `.meta` |
+
+The private key is an organisation secret, used only by the shared
+[sign-and-publish workflow](https://github.com/Project-Colony/Project-Colony-Resources/blob/main/.github/workflows/sign-and-publish.yml)
+in a job that builds nothing; the jobs that compile SAM never see it. Colony
+checks all three files before it installs or updates SAM, refuses a release
+older than the one installed, and refuses any asset whose signature does not
+verify. To check a download yourself with OpenSSL 3 (the same commands work for
+every asset):
+
+```bash
+cat > colony-release.pub <<'EOF'
+-----BEGIN PUBLIC KEY-----
+MCowBQYDK2VwAyEARNjg3Nn8H6/aBg1unwGjkUTcrdTxERNefVaqU8cFu0s=
+-----END PUBLIC KEY-----
+EOF
+a=sam-colony-edition-linux
+openssl pkeyutl -verify -pubin -inkey colony-release.pub -rawin -in "$a" -sigfile "$a.sig"
+openssl pkeyutl -verify -pubin -inkey colony-release.pub -rawin -in "$a.meta" -sigfile "$a.meta.sig"
+cat "$a.meta"     # version=<tag>, asset=<file name>, sha256=<digest>
+sha256sum "$a"    # the digest must equal the sha256 line
+```
+
+SignPath is not used: SAM is not eligible for SignPath Foundation signing, so
+the Windows executable carries these signatures and no Authenticode signature.
+The macOS executables are not signed or notarised by Apple.
+
+How releases are built, signed and published:
+[design/releases.md](https://github.com/Project-Colony/Project-Colony-Resources/blob/main/design/releases.md#5-signing).
+
+## Privacy
+
+SAM sends no telemetry, no analytics and no crash reports. It has no account of
+its own and never sees your Steam password: it acts through the Steam client
+you are already signed in to.
+
+| Data | Stored or sent | Where, and why |
+|---|---|---|
+| Steam app list | downloaded, then stored | At most once a day, SAM downloads `games_appid.json`, the ID and name of every Steam app, from `raw.githubusercontent.com`. It comes from [jsnli/steamappidlist](https://github.com/jsnli/steamappidlist), a personal repository of the upstream author that SAM follows unpinned. The request carries SAM's own User-Agent (`sam-colony-edition/<version>`) and nothing about you; GitHub sees your IP address ([GitHub's privacy statement](https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement)). The list is cached in `cache.json`, below. |
+| Game art and achievement icons | loaded from Valve's CDN | When you open a game, the window loads its header image from `shared.cloudflare.steamstatic.com` and its achievement icons from `cdn.cloudflare.steamstatic.com`, so Valve's CDN learns which game you opened ([Valve's privacy policy](https://store.steampowered.com/privacy_agreement/)). |
+| SteamID and persona name | read from the local Steam client | Asked from the running Steam client through Valve's Steamworks library, to show which account is in use. SAM does not store or send them. |
+| Achievements and statistics | written to your Steam account | The changes you apply go through the Steam client, which syncs them to Valve's servers. They appear on your profile like any others. |
+| Play status | reported by Steam | Opening a game starts Steamworks as that game, so Steam shows you as playing it and records playtime while SAM has it open. |
+| Steam files | read | The achievement and statistic schemas in Steam's `appcache/stats/`. On Windows, the Steam install path in `HKCU\Software\Valve\Steam`. |
+| App list cache | stored | `cache.json` in `$XDG_CACHE_HOME/SAM-Colony-Edition/` (by default `~/.cache/SAM-Colony-Edition/`) on Linux, `%LOCALAPPDATA%\SAM-Colony-Edition\` on Windows, `~/Library/Caches/SAM-Colony-Edition/` on macOS. |
+| Steam runtime library | stored | Extracted on first launch, see [Direct binary download](#direct-binary-download). |
+| WebView data | stored | The window's web engine keeps its cache, including the images above, in `$XDG_DATA_HOME/ai.projectcolony.sam/` (by default `~/.local/share/ai.projectcolony.sam/`) on Linux and `%LOCALAPPDATA%\ai.projectcolony.sam\` on Windows. On macOS the system's WebKit keeps it under `~/Library/WebKit/` and `~/Library/Caches/`, in a folder macOS names after the program. |
+
+SAM itself connects to no server except the ones in this table, and only for
+the action named there. The Steam client keeps talking to Valve as it always
+does.
 
 ## Credits
 
-- [jsnli/Samira](https://github.com/jsnli/Samira): the upstream this program is derived from, and the origin of most of what it still is. The VDF parser, the Steamworks integration, and the overall shape of the Rust backend are upstream's work, much of it unchanged here. Samira is GPL-3.0; this fork inherits those terms.
-- [Valve](https://partner.steamgames.com/): Steamworks SDK (redistributed per [SDK License](https://partner.steamgames.com/documentation/sdk_access_agreement)).
-- [Project Colony](https://github.com/Project-Colony): design language and distribution ecosystem.
+- [jsnli/Samira](https://github.com/jsnli/Samira): the upstream this program is
+  derived from, and the origin of most of what it still is. The VDF parser, the
+  Steamworks integration and the shape of the Rust backend are upstream's work,
+  much of it unchanged here.
+- [Valve](https://partner.steamgames.com/): the Steamworks SDK, redistributed
+  under the [Steamworks SDK Access Agreement](https://partner.steamgames.com/documentation/sdk_access_agreement).
+- [JetBrains Mono](https://www.jetbrains.com/lp/mono/) by JetBrains, as patched
+  by [Nerd Fonts](https://www.nerdfonts.com/): the interface font, under the SIL
+  Open Font License 1.1.
 
 ## License
 
-GPL-3.0. See `LICENSE`.
+GPL-3.0, SPDX identifier `GPL-3.0-only`. See [LICENSE](LICENSE).
 
-This is a derivative work of [jsnli/Samira](https://github.com/jsnli/Samira), which is
-published under the GNU General Public License version 3. Substantial upstream code
-survives here verbatim, so that licence carries forward: this fork is GPL-3.0 and cannot
-be redistributed under anything more permissive. Earlier revisions of this README claimed
-"MIT, matching upstream", which was true of neither project.
+This is a derivative work of [jsnli/Samira](https://github.com/jsnli/Samira),
+which is published under the GNU General Public License version 3. Substantial
+upstream code survives here verbatim, so that licence carries forward: this fork
+cannot be redistributed under anything more permissive. Earlier revisions of
+this README claimed "MIT, matching upstream", which was true of neither project.
 
-The SPDX identifier is the plain `GPL-3.0` rather than `GPL-3.0-or-later`. Upstream ships
-the bare GPLv3 text with no "or any later version" notice, and section 14 of that licence
-grants the option of following a later version only when the program itself says so.
-Declaring `-or-later` would assert a permission upstream never gave, so the
-version-neutral string is used instead.
+The licence is GPL-3.0-only rather than GPL-3.0-or-later because upstream ships
+the bare GPLv3 text with no "or any later version" notice, and section 14 of
+that licence grants the option of following a later version only when the
+program itself says so. Declaring "or later" would assert a permission upstream
+never gave.
+
+The executables also embed Valve's proprietary Steamworks runtime
+(`steam_api64.dll`, `libsteam_api.so` or `libsteam_api.dylib`), which is
+redistributed under the Steamworks SDK Access Agreement and is not covered by
+the GPL.
