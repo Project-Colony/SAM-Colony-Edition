@@ -10,9 +10,10 @@
 
 Steam has no way to take back an achievement a bug unlocked, or to grant one a
 broken game never awards. The classic Steam Achievement Manager runs on Windows
-only, and its Linux port, Samira, loads no achievements at all for most games. SAM -
-Colony Edition does the job on all three desktops, from one self-contained
-executable that talks to the Steam client you are already signed in to.
+only, and Samira, the Linux manager this is forked from, loads no achievements
+at all for most games. SAM - Colony Edition does the job on all three desktops,
+from one self-contained executable that talks to the Steam client you are
+already signed in to.
 
 > **Status:** releases are built in CI and every asset is signed with the
 > Project Colony release key since v0.7.0. CI builds the frontend and checks the
@@ -30,7 +31,7 @@ executable that talks to the Steam client you are already signed in to.
 - **[Steam Achievement Manager](https://github.com/gibbed/SteamAchievementManager)**
   is the original, and it is Windows only.
 - **[Samira](https://github.com/jsnli/Samira)**, which this is a fork of, brings
-  it to Linux, but loads no achievements for most games and no icons past the
+  the idea to Linux, but loads no achievements for most games and no icons past the
   first 32 achievements (see [What changed from upstream](#what-changed-from-upstream)).
 - **SAM - Colony Edition** runs on Linux, Windows and macOS, ships as a single
   executable per platform with no installer, and installs and updates through
