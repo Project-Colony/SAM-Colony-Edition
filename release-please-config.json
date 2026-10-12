@@ -2,13 +2,29 @@
   "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
   "packages": {
     ".": {
-      "release-type": "node",
+      "release-type": "simple",
+      "package-name": "sam-colony-edition",
       "changelog-path": "CHANGELOG.md",
       "include-component-in-tag": false,
       "draft": false,
       "prerelease": false,
       "bump-minor-pre-major": false,
       "extra-files": [
+        {
+          "type": "json",
+          "path": "package.json",
+          "jsonpath": "$.version"
+        },
+        {
+          "type": "json",
+          "path": "package-lock.json",
+          "jsonpath": "$.version"
+        },
+        {
+          "type": "json",
+          "path": "package-lock.json",
+          "jsonpath": "$.packages[''].version"
+        },
         {
           "type": "toml",
           "path": "src-tauri/Cargo.toml",
@@ -59,5 +75,5 @@
       ]
     }
   },
-  "pull-request-header": "The next release, assembled from the commits since the last one. Merging this tags it, and the tag is what builds, signs and publishes."
+  "pull-request-header": "The next release, assembled from the commits since the last one. Merging this tags it, and the tag is what builds and publishes."
 }
