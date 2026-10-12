@@ -40,6 +40,8 @@ impl Default for User {
 }
 
 pub fn start_client(appid: u32) -> Result<Client, String> {
+    crate::bootstrap::ready()?;
+
     // init_app returns a typed error. Translate the three variants into
     // user-facing messages so the UI can tell apart "Steam not running" from
     // "you don't own this game" instead of dumping a generic catch-all.

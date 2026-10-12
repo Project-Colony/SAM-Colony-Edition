@@ -60,10 +60,29 @@ jobs:
       # before a release depends on them.
       - run: npm run build
       - run: cargo check --manifest-path src-tauri/Cargo.toml --target ${{ matrix.target }}
-      # The unit tests cover OS-independent logic, so one leg is enough.
+      # Linux and macOS load the Steamworks library in their own way
+      # (src-tauri/src/bootstrap.rs), which a unit test calls through. The rest
+      # is OS-independent logic.
       - name: Unit tests
-        if: startsWith(matrix.platform, 'ubuntu-')
+        if: runner.os != 'Windows'
         run: cargo test --locked --manifest-path src-tauri/Cargo.toml
+      # v0.7.0 shipped Linux and macOS executables that did not start unless
+      # Valve's libsteam_api was installed system-wide. Run the executable from
+      # a directory of its own, with no library path, as a user would. On
+      # macOS, also check that no symbol is bound to the weakly linked library:
+      # it would be null at runtime instead of failing here.
+      - name: Start without libsteam_api installed
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          cargo build --locked --manifest-path src-tauri/Cargo.toml
+          d=$(mktemp -d)
+          cp src-tauri/target/debug/samira "$d/"
+          if [ "$RUNNER_OS" = macOS ] && nm -m -u "$d/samira" | grep -F libsteam_api; then
+            echo "::error::these symbols are bound to libsteam_api instead of SAM's own stubs"
+            exit 1
+          fi
+          env -u LD_LIBRARY_PATH -u DYLD_LIBRARY_PATH -u DYLD_FALLBACK_LIBRARY_PATH "$d/samira" --version
 
   # rust-version in src-tauri/Cargo.toml is a promise about who can build SAM.
   # The check job only ever runs on stable, so this leg is what keeps it true.
