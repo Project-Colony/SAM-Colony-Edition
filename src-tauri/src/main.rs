@@ -5,7 +5,9 @@
 mod bootstrap;
 mod commands;
 mod dataset;
+mod error;
 mod paths;
+mod preferences;
 mod state;
 mod steam;
 mod vdf;
@@ -35,6 +37,9 @@ fn main() {
             commands::cmd_load_statistics,
             commands::cmd_commit_statistics,
             commands::cmd_retrieve_user,
+            commands::cmd_load_preferences,
+            commands::cmd_save_preferences,
+            commands::cmd_storage_paths,
         ])
         .setup(|app| {
             // Built here rather than in tauri.conf.json so the WebView keeps its

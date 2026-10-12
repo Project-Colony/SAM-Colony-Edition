@@ -2954,6 +2954,7 @@ dependencies = [
 name = "samira"
 version = "0.7.0"
 dependencies = [
+ "dirs",
  "fuzzy-matcher",
  "reqwest",
  "serde",

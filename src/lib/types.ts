@@ -25,5 +25,7 @@ export interface App {
   name: string;
 }
 
-export type StatusLine = { msg: string; fresh: boolean };
+/** A log line, rendered in whatever language is current when it is shown. */
+export type Message = () => string;
+export type StatusLine = { id: number; text: Message; fresh: boolean };
 export type View = "achievements" | "statistics";

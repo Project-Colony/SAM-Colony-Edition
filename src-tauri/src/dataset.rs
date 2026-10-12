@@ -11,25 +11,26 @@ pub struct Game {
     pub name: String,
 }
 
-pub fn fetch_games() -> Result<(Vec<Game>, String), Box<dyn std::error::Error>> {
+/// The games list and a status code for the UI saying where it came from.
+pub fn fetch_games() -> Result<(Vec<Game>, &'static str), Box<dyn std::error::Error>> {
     let cache_path = get_cache_path()?;
 
     if cache_is_fresh(&cache_path) {
         let data = std::fs::read_to_string(&cache_path)?;
         let games = serde_json::from_str(&data)?;
-        return Ok((games, "Database loaded from cache.".to_string()));
+        return Ok((games, "status_database_cached"));
     }
 
     match fetch_network() {
         Ok(games) => {
             let _ = write_cache(&cache_path, &games);
-            Ok((games, "Database updated from network.".to_string()))
+            Ok((games, "status_database_updated"))
         }
         Err(e) => {
             if cache_path.exists() {
                 let data = std::fs::read_to_string(&cache_path)?;
                 let games = serde_json::from_str(&data)?;
-                Ok((games, "Network unavailable, using cached database.".to_string()))
+                Ok((games, "status_database_offline"))
             } else {
                 Err(e)
             }

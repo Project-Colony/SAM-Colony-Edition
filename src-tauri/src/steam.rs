@@ -1,3 +1,4 @@
+use crate::error::UiError;
 use crate::vdf::{self, VdfMap};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -24,38 +25,30 @@ pub struct Stat {
     pub value: i32,
 }
 
-#[derive(Serialize, Deserialize)]
+/// The signed-in Steam user. Empty, with id 0, when no game is loaded.
+#[derive(Default, Serialize, Deserialize)]
 pub struct User {
     user_name: String,
     user_steam_id: u64,
 }
 
-impl Default for User {
-    fn default() -> Self {
-        User {
-            user_name: "No user found.".to_string(),
-            user_steam_id: 0,
-        }
-    }
-}
-
-pub fn start_client(appid: u32) -> Result<Client, String> {
-    // init_app returns a typed error. Translate the three variants into
-    // user-facing messages so the UI can tell apart "Steam not running" from
-    // "you don't own this game" instead of dumping a generic catch-all.
+pub fn start_client(appid: u32) -> Result<Client, UiError> {
+    // init_app returns a typed error. Map the three variants to their own
+    // codes so the UI can tell apart "Steam not running" from "you don't own
+    // this game" instead of dumping a generic catch-all.
     let client = match Client::init_app(appid) {
         Ok(c) => c,
         Err(SteamAPIInitError::NoSteamClient(_)) => {
-            return Err("Steam is not running. Start Steam and sign in, then try again.".to_string());
+            return Err(UiError::new("error_steam_not_running"));
         }
         Err(SteamAPIInitError::VersionMismatch(_)) => {
-            return Err("Steam client is out of date. Update Steam and try again.".to_string());
+            return Err(UiError::new("error_steam_outdated"));
         }
         Err(SteamAPIInitError::FailedGeneric(_)) => {
             // FailedGeneric covers "user doesn't own this app", "appid not
             // fully configured", and a few rarer conditions. In SAM the
             // overwhelmingly likely cause is ownership.
-            return Err("You don't own this game (or it isn't activated on your Steam account).".to_string());
+            return Err(UiError::new("error_game_not_owned"));
         }
     };
 
@@ -91,7 +84,7 @@ pub fn start_client(appid: u32) -> Result<Client, String> {
 
     match result {
         Ok(()) => Ok(client),
-        Err(panic_error) => Err(format!("Steam callback setup failed: {:?}", panic_error)),
+        Err(panic_error) => Err(UiError::with("error_steam_callback", format!("{panic_error:?}"))),
     }
 }
 
@@ -102,7 +95,7 @@ pub fn retrieve_user(client: Client) -> User {
     }
 }
 
-pub fn load_achievements(client: Client) -> Result<Vec<Achievement>, String> {
+pub fn load_achievements(client: Client) -> Result<Vec<Achievement>, UiError> {
     let result = panic::catch_unwind(AssertUnwindSafe(|| {
         // Pump the callback queue once more in case UserStatsReceived
         // arrived after start_client returned.
@@ -149,7 +142,7 @@ pub fn load_achievements(client: Client) -> Result<Vec<Achievement>, String> {
 
     match result {
         Ok(list) => Ok(list),
-        Err(panic_error) => Err(format!("Panic occured: {:?}", panic_error)),
+        Err(panic_error) => Err(UiError::with("error_load_achievements", format!("{panic_error:?}"))),
     }
 }
 
@@ -203,12 +196,12 @@ pub fn load_achievement_icons(appid: u32) -> HashMap<String, String> {
     paths
 }
 
-pub fn commit_achievement(client: Client, name: String, unlocked: bool) -> Result<(), String> {
+pub fn commit_achievement(client: Client, name: String, unlocked: bool) -> Result<(), UiError> {
     let user_stats = client.user_stats();
     let achievement = user_stats.achievement(&name);
     let written = if unlocked { achievement.set() } else { achievement.clear() };
     // Steam refuses unknown names and writes made before the stats arrived.
-    written.map_err(|()| "Steam refused the change".to_string())
+    written.map_err(|()| UiError::new("error_steam_refused_change"))
 }
 
 /// Uploads the pending achievement and stat writes and waits for Steam's verdict.
@@ -217,7 +210,7 @@ pub fn commit_achievement(client: Client, name: String, unlocked: bool) -> Resul
 /// `UserStatsStored`, whose result says whether it kept the values or
 /// rejected them (a stat outside its bounds, an achievement the game only
 /// lets its own servers set), so wait for that before reporting success.
-pub fn store_stats(client: Client) -> Result<(), String> {
+pub fn store_stats(client: Client) -> Result<(), UiError> {
     let stored: Arc<Mutex<Option<Result<(), SteamError>>>> = Arc::default();
     let stored_clone = Arc::clone(&stored);
     // Bound to a named local: dropping the handle unregisters the callback.
@@ -228,17 +221,17 @@ pub fn store_stats(client: Client) -> Result<(), String> {
     client
         .user_stats()
         .store_stats()
-        .map_err(|()| "Steam refused to upload the changes".to_string())?;
+        .map_err(|()| UiError::new("error_steam_refused_upload"))?;
 
     // Same 5 s budget as the stats request in start_client.
     for _ in 0..50 {
         client.run_callbacks();
         if let Some(result) = stored.lock().unwrap().take() {
-            return result.map_err(|e| format!("Steam rejected the changes: {e}"));
+            return result.map_err(|e| UiError::with("error_steam_rejected_changes", e));
         }
         ::std::thread::sleep(::std::time::Duration::from_millis(100));
     }
-    Err("Steam did not confirm the upload within 5 seconds. Refresh to see what was saved.".to_string())
+    Err(UiError::new("error_steam_upload_timeout"))
 }
 
 /// Returns the Steam install root, or None.
@@ -348,13 +341,13 @@ pub fn load_statistics(client: Client, appid: u32) -> Vec<Stat> {
         .collect()
 }
 
-pub fn commit_statistics(client: Client, name: String, value: i32) -> Result<(), String> {
+pub fn commit_statistics(client: Client, name: String, value: i32) -> Result<(), UiError> {
     let user_stats = client.user_stats();
     // Steam refuses unknown names, non-integer stats and writes made before
     // the stats arrived.
     user_stats
         .set_stat_i32(&name, value)
-        .map_err(|()| "Steam refused the new value".to_string())
+        .map_err(|()| UiError::new("error_steam_refused_value"))
 }
 
 #[cfg(test)]
