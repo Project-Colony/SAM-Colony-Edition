@@ -122,7 +122,7 @@ npm run tauri build -- --no-bundle
 The executable is `src-tauri/target/release/samira` (`samira.exe` on Windows).
 `npm run tauri dev` runs SAM from source with live reload.
 
-Requires Rust 1.88 or newer, the current Node LTS, and the
+Requires Rust 1.90 or newer, the current Node LTS, and the
 [Tauri prerequisites](https://tauri.app/start/prerequisites/) for your OS. On
 Debian and Ubuntu:
 

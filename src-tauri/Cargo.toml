@@ -1,41 +1,43 @@
 [package]
 name = "samira"
 version = "0.7.0"
-description = "Steam achievement manager for Linux"
-authors = ["you"]
+description = "Cross-platform Steam achievement and stat manager (SAM - Colony Edition)"
+authors = ["Project Colony"]
 edition = "2021"
-# The oldest toolchain the locked dependencies accept (plist, time); CI checks it.
-rust-version = "1.88"
+# The oldest toolchain the locked dependencies accept (tauri 2.12 and muda 0.20
+# need 1.90); CI builds on exactly this toolchain.
+rust-version = "1.90"
 # Derivative work of jsnli/Samira, which is GPL-3.0. Upstream ships the bare
 # GPLv3 text with no "or any later version" notice, so no "-or-later" is claimed.
-license = "GPL-3.0"
+license = "GPL-3.0-only"
+repository = "https://github.com/Project-Colony/SAM-Colony-Edition"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [build-dependencies]
-tauri-build = { version = "2", features = [] }
+tauri-build = { version = "2.7.2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = [] }
-reqwest = { version = "0.13.3", features = ["blocking", "json"] }
-serde = { version = "1.0.210", features = ["derive"] }
-serde_json = "1.0.128"
+tauri = { version = "2.12.3", features = [] }
+reqwest = { version = "0.13.5", features = ["blocking", "json"] }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
 steamworks = "0.13.1"
-fuzzy-matcher = "0.3"
+fuzzy-matcher = "0.3.7"
 
 [target.'cfg(target_os = "windows")'.dependencies]
-winreg = "0.56"
-windows-sys = { version = "0.61", features = ["Win32_System_Console", "Win32_System_LibraryLoader", "Win32_Foundation"] }
+winreg = "0.56.0"
+windows-sys = { version = "0.61.2", features = ["Win32_System_Console", "Win32_System_LibraryLoader", "Win32_Foundation"] }
 
 [features]
 # This feature is used for production builds or when a dev server is not specified, DO NOT REMOVE!!
 custom-protocol = ["tauri/custom-protocol"]
 
 [profile.release]
-lto = "fat"
+lto = "thin"
 codegen-units = 1
 # panic = "abort" disables catch_unwind which we rely on to recover from
 # steamworks panics (games without achievements panic in get_num_achievements).
 panic = "unwind"
-strip = true
+strip = "symbols"
 opt-level = 3

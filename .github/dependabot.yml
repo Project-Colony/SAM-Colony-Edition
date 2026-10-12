@@ -41,6 +41,13 @@ updates:
     # from one (postcss, devalue, source-map-js).
     allow:
       - dependency-type: all
+    ignore:
+      # svelte-check does not support TypeScript 7 yet: its peer range stops
+      # at 6, so npm ci fails on 7, and 4.7 only runs 7 through an
+      # experimental --tsgo mode that needs TypeScript 6 installed alongside.
+      # Remove this once a svelte-check release supports TypeScript 7 directly.
+      - dependency-name: typescript
+        update-types: ["version-update:semver-major"]
     groups:
       npm-minor:
         update-types: ["minor", "patch"]

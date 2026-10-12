@@ -39,8 +39,12 @@ jobs:
             patchelf \
             libsoup-3.0-dev
 
-      - uses: dtolnay/rust-toolchain@89b12181fb390509a0842a86cc55eeb8eb928c1d # stable branch
+      # Pinned to master with `toolchain: stable` rather than to the `stable`
+      # branch: that branch is rebased onto every master commit, so a SHA
+      # pinned on it stops being reachable from any branch.
+      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master, 2026-10-09
         with:
+          toolchain: stable
           targets: ${{ matrix.target }}
           components: clippy
 
@@ -51,7 +55,7 @@ jobs:
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: 20
+          node-version: lts/*
           cache: npm
 
       - run: npm ci
@@ -59,11 +63,13 @@ jobs:
       # platform's native rolldown and lightningcss bindings are exercised here
       # before a release depends on them.
       - run: npm run build
-      - run: cargo check --manifest-path src-tauri/Cargo.toml --target ${{ matrix.target }}
-      # The unit tests cover OS-independent logic, so one leg is enough.
+      # Clippy type-checks every target, tests included, so it stands in for
+      # cargo check. Each OS compiles its own cfg branches (registry lookup,
+      # console handling, library loading), so every leg lints and tests.
+      - name: Clippy
+        run: cargo clippy --locked --manifest-path src-tauri/Cargo.toml --all-targets --target ${{ matrix.target }} -- -D warnings
       - name: Unit tests
-        if: startsWith(matrix.platform, 'ubuntu-')
-        run: cargo test --locked --manifest-path src-tauri/Cargo.toml
+        run: cargo test --locked --manifest-path src-tauri/Cargo.toml --target ${{ matrix.target }}
 
   # rust-version in src-tauri/Cargo.toml is a promise about who can build SAM.
   # The check job only ever runs on stable, so this leg is what keeps it true.
@@ -92,7 +98,7 @@ jobs:
             patchelf \
             libsoup-3.0-dev
 
-      - uses: dtolnay/rust-toolchain@89b12181fb390509a0842a86cc55eeb8eb928c1d # stable branch
+      - uses: dtolnay/rust-toolchain@e2a55d2ffb04f378e9626c28d38b36d230d1e12f # master, 2026-10-09
         with:
           toolchain: ${{ steps.msrv.outputs.version }}
 
