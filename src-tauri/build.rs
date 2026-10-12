@@ -68,7 +68,7 @@ fn write_steam_stubs(os: &str, arch: &str) {
     }
     let list: String = names.iter().map(|n| format!("    c\"{n}\",\n")).collect();
     let code = format!(
-        "const NAMES: [&std::ffi::CStr; {}] = [\n{list}];\n\nstd::arch::global_asm!(r#\"\n{asm}\"#, table = sym TABLE);\n",
+        "static NAMES: [&std::ffi::CStr; {}] = [\n{list}];\n\nstd::arch::global_asm!(r#\"\n{asm}\"#, table = sym TABLE);\n",
         names.len()
     );
     std::fs::write(
