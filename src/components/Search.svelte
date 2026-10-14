@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { t } from "../i18n/index.svelte";
   import { cmd } from "../lib/tauri";
   import type { App } from "../lib/types";
 
@@ -100,7 +101,7 @@
   <input
     class="input"
     type="text"
-    placeholder="Search by name or App ID"
+    placeholder={t("search_placeholder")}
     value={query}
     oninput={handleChange}
   />
@@ -108,14 +109,14 @@
   {#if active && hasState}
     <ul class="dropdown">
       {#if !databaseReady && query.trim().length >= 2}
-        <li class="dropdown__hint dim">Loading database, retry in a moment…</li>
+        <li class="dropdown__hint dim">{t("search_loading_database")}</li>
       {:else if inFlight}
-        <li class="dropdown__hint dim">Searching…</li>
+        <li class="dropdown__hint dim">{t("search_searching")}</li>
       {:else}
         {#if queryIsNumeric}
           <li>
             <button class="dropdown__item dropdown__item--manual" onclick={() => manualLaunch(queryAsNumber)}>
-              <span class="dropdown__lead">Launch App ID</span>
+              <span class="dropdown__lead">{t("search_launch_app_id")}</span>
               <span class="dropdown__id">{queryAsNumber}</span>
             </button>
           </li>
@@ -129,7 +130,7 @@
           </li>
         {/each}
         {#if searched && applist.length === 0 && !queryIsNumeric}
-          <li class="dropdown__hint dim">No games found for "{query}"</li>
+          <li class="dropdown__hint dim">{t("search_no_results", { query })}</li>
         {/if}
       {/if}
     </ul>
@@ -147,11 +148,11 @@
     list-style: none;
     margin: 0;
     padding: 4px;
-    background: var(--parchment);
-    border: var(--border-thin) solid var(--red);
+    background: var(--colony-bg-card);
+    border: 1px solid var(--colony-border-subtle);
     border-radius: var(--radius-card);
-    box-shadow: 0 4px 12px var(--parchment-shadow);
-    max-height: 320px;
+    box-shadow: 0 4px 12px color-mix(in srgb, var(--colony-bg-sidebar) 50%, transparent);
+    max-height: calc(320px * var(--font-scale));
     overflow: auto;
     display: flex;
     flex-direction: column;
@@ -161,31 +162,26 @@
     width: 100%;
     text-align: left;
     background: transparent;
-    border: 1px solid transparent;
+    border: none;
     border-radius: var(--radius-input);
     padding: 6px 8px;
-    font-family: var(--font-body);
-    font-size: var(--fs-md);
+    font-size: var(--fs-13);
     font-weight: var(--fw-regular);
-    color: var(--ink);
+    color: var(--colony-text-primary);
     cursor: pointer;
     display: flex;
     justify-content: space-between;
     align-items: baseline;
     gap: 8px;
   }
-  .dropdown__item:hover {
-    background: var(--parchment-hover);
-    border-color: var(--red-soft);
-  }
-  .dropdown__item--manual { font-weight: var(--fw-semibold); }
-  .dropdown__lead { color: var(--red); }
-  .dropdown__name { font-weight: var(--fw-medium); }
-  .dropdown__id { font-size: var(--fs-sm); font-weight: var(--fw-light); }
+  .dropdown__item:hover { background: var(--colony-bg-card-hover); }
+  .dropdown__item--manual { font-weight: var(--fw-bold); }
+  .dropdown__lead { color: var(--colony-accent); }
+  .dropdown__name { font-weight: var(--fw-medium); overflow-wrap: anywhere; }
+  .dropdown__id { font-size: var(--fs-11); }
   .dropdown__hint {
     padding: 8px 10px;
-    font-size: var(--fs-sm);
-    font-style: italic;
+    font-size: var(--fs-11);
     text-align: center;
   }
 </style>

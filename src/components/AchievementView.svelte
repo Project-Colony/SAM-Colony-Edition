@@ -1,6 +1,7 @@
 <script lang="ts">
+  import { describeError, t } from "../i18n/index.svelte";
   import { cmd } from "../lib/tauri";
-  import type { Achievement } from "../lib/types";
+  import type { Achievement, Message } from "../lib/types";
 
   let {
     achievements,
@@ -10,7 +11,7 @@
   }: {
     achievements: Achievement[];
     icons: Record<string, string>;
-    onStatus: (msg: string | string[]) => void;
+    onStatus: (msg: Message | Message[]) => void;
     onReload: (refresh: boolean) => void;
   } = $props();
 
@@ -80,7 +81,7 @@
   }
 
   async function apply() {
-    const alerts: string[] = [];
+    const alerts: Message[] = [];
     let written = 0;
     for (const it of items) {
       const original = achievements.find((a) => a.api_name === it.api_name);
@@ -88,9 +89,11 @@
         try {
           await cmd.commitAchievement(it.api_name, it.status);
           written++;
-          alerts.push(`${it.name} ${it.status ? "unlocked" : "locked"}`);
+          const { name, status } = it;
+          alerts.push(() => t(status ? "log_achievement_unlocked" : "log_achievement_locked", { name }));
         } catch (err) {
-          alerts.push(`Failed: ${it.name} (${String(err)})`);
+          const name = it.name;
+          alerts.push(() => t("log_write_failed", { name, error: describeError(err) }));
         }
       }
     }
@@ -100,15 +103,19 @@
       try {
         await cmd.storeStats();
       } catch (err) {
-        alerts.unshift(`Store stats failed: ${String(err)}`);
+        alerts.unshift(() => t("log_upload_failed", { error: describeError(err) }));
       }
     }
-    onStatus(alerts.length > 0 ? alerts : "No changes to commit");
+    onStatus(alerts.length > 0 ? alerts : () => t("log_no_changes"));
     // Reload in every case: a rejected upload reverts Steam's local values.
     onReload(false);
   }
 
   let unlockedCount = $derived(items.filter((a) => a.status).length);
+
+  // Font Awesome Solid, for an achievement whose icon Steam did not provide.
+  const TROPHY = "\u{f091}";
+  const LOCK = "\u{f023}";
 </script>
 
 <div class="ach">
@@ -116,7 +123,7 @@
     <input
       class="input ach__filter"
       type="text"
-      placeholder="Filter by name or description"
+      placeholder={t("achievements_filter_placeholder")}
       oninput={handleFilter}
     />
     <div class="ach__count">
@@ -125,21 +132,21 @@
       <span class="count__total dim">{items.length}</span>
     </div>
     <div class="ach__buttons">
-      <button class="btn" onclick={() => onReload(true)}>Refresh</button>
-      <button class="btn btn--primary" onclick={apply}>Apply changes</button>
+      <button class="btn" onclick={() => onReload(true)}>{t("action_refresh")}</button>
+      <button class="btn btn--primary" onclick={apply}>{t("action_apply")}</button>
     </div>
   </header>
 
   <nav class="ach__subnav">
-    <button class="btn" onclick={() => selectAll(true)}>Select all</button>
-    <button class="btn" onclick={() => selectAll(false)}>Deselect all</button>
-    <button class="btn" onclick={() => showLockedOnly(true)}>Unlocked only</button>
-    <button class="btn" onclick={() => showLockedOnly(false)}>Locked only</button>
+    <button class="btn" onclick={() => selectAll(true)}>{t("achievements_select_all")}</button>
+    <button class="btn" onclick={() => selectAll(false)}>{t("achievements_deselect_all")}</button>
+    <button class="btn" onclick={() => showLockedOnly(true)}>{t("achievements_unlocked_only")}</button>
+    <button class="btn" onclick={() => showLockedOnly(false)}>{t("achievements_locked_only")}</button>
   </nav>
 
   {#if items.length === 0}
     <div class="panel ach__empty">
-      <p class="muted">No achievements found.</p>
+      <p class="muted">{t("achievements_none")}</p>
     </div>
   {:else}
     <ul class="ach__list">
@@ -162,8 +169,8 @@
                   src={icons[item.api_name + (item.status ? "" : "-gray")]}
                 />
               {:else}
-                <div class="ach__icon-fallback" class:ach__icon-fallback--locked={!item.status}>
-                  {item.status ? "✦" : "·"}
+                <div class="ach__icon-fallback" class:ach__icon-fallback--locked={!item.status} aria-hidden="true">
+                  {item.status ? TROPHY : LOCK}
                 </div>
               {/if}
             </div>
@@ -184,16 +191,16 @@
 
   .ach__toolbar {
     display: grid;
-    grid-template-columns: 1fr auto auto;
+    grid-template-columns: minmax(0, 1fr) auto auto;
     gap: 12px;
     align-items: center;
     padding: 10px 14px;
   }
-  .ach__filter { max-width: 360px; }
-  .ach__count { font-family: var(--font-display); display: flex; align-items: baseline; gap: 4px; }
-  .count__num { font-size: var(--fs-xl); font-weight: var(--fw-bold); color: var(--red); }
-  .count__sep, .count__total { font-size: var(--fs-lg); font-weight: var(--fw-light); }
-  .ach__buttons { display: flex; gap: 6px; }
+  .ach__filter { max-width: calc(360px * var(--font-scale)); }
+  .ach__count { display: flex; align-items: baseline; gap: 4px; }
+  .count__num { font-size: var(--fs-18); font-weight: var(--fw-bold); color: var(--colony-text-primary); }
+  .count__sep, .count__total { font-size: var(--fs-15); }
+  .ach__buttons { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
 
   .ach__subnav { display: flex; gap: 6px; flex-wrap: wrap; }
 
@@ -209,65 +216,57 @@
   }
   .ach__list li { margin: 0; }
   .ach__list .card { cursor: pointer; align-items: center; }
+  .ach__list .card:hover { background: var(--colony-bg-card-hover); }
 
   .ach__checkbox {
     appearance: none;
-    width: 18px; height: 18px;
-    border: var(--border-thin) solid var(--red);
-    border-radius: 3px;
-    background: var(--parchment);
+    width: calc(18px * var(--font-scale));
+    height: calc(18px * var(--font-scale));
+    border: 1px solid var(--colony-text-dimmer);
+    border-radius: 4px;
+    background: var(--colony-bg-input);
     cursor: pointer;
     display: grid;
     place-items: center;
     flex-shrink: 0;
+    margin: 0;
   }
   .ach__checkbox:checked {
-    background: var(--red);
+    background: var(--colony-accent);
+    border-color: var(--colony-accent);
   }
   .ach__checkbox:checked::after {
-    content: "✓";
-    color: var(--parchment);
-    font-weight: var(--fw-bold);
-    font-size: 13px;
+    content: "\f00c";
+    font-family: var(--colony-glyph-font);
+    color: var(--colony-on-accent);
+    font-size: var(--fs-11);
     line-height: 1;
   }
 
   .ach__icon-wrap {
     width: 48px;
     height: 48px;
-    border: 1px solid var(--red-soft);
+    border: 1px solid var(--colony-border-subtle);
     border-radius: var(--radius-input);
     overflow: hidden;
-    background: var(--parchment);
+    background: var(--colony-bg-input);
     flex-shrink: 0;
     display: grid;
     place-items: center;
   }
   .ach__icon { width: 100%; height: 100%; object-fit: cover; display: block; }
   .ach__icon-fallback {
-    color: var(--red);
-    font-family: var(--font-display);
-    font-size: var(--fs-xl);
-    font-weight: var(--fw-bold);
+    color: var(--colony-accent);
+    font-family: var(--colony-icon-font);
+    font-weight: 900;
+    font-size: var(--fs-18);
   }
-  .ach__icon-fallback--locked {
-    color: var(--ink-very-dim);
-    font-weight: var(--fw-light);
-  }
+  .ach__icon-fallback--locked { color: var(--colony-text-dimmer); }
 
   .ach__body { flex: 1; min-width: 0; }
-  .ach__name {
-    font-family: var(--font-display);
-    font-size: var(--fs-md);
-    font-weight: var(--fw-semibold);
-  }
-  .ach__desc { font-size: var(--fs-sm); margin-top: 2px; }
-  .ach__api {
-    font-size: var(--fs-xs);
-    font-style: italic;
-    font-weight: var(--fw-light);
-    margin-top: 4px;
-  }
+  .ach__name { font-weight: var(--fw-bold); overflow-wrap: anywhere; }
+  .ach__desc { font-size: var(--fs-11); margin-top: 2px; }
+  .ach__api { font-size: var(--fs-10); margin-top: 4px; overflow-wrap: anywhere; }
 
   .ach__empty { text-align: center; padding: 40px; }
 </style>

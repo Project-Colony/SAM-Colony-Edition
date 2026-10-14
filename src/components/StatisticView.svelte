@@ -1,6 +1,7 @@
 <script lang="ts">
+  import { describeError, t } from "../i18n/index.svelte";
   import { cmd } from "../lib/tauri";
-  import type { Stat } from "../lib/types";
+  import type { Message, Stat } from "../lib/types";
 
   let {
     stats,
@@ -8,7 +9,7 @@
     onReload,
   }: {
     stats: Stat[];
-    onStatus: (msg: string | string[]) => void;
+    onStatus: (msg: Message | Message[]) => void;
     onReload: (refresh: boolean) => void;
   } = $props();
 
@@ -19,16 +20,18 @@
   });
 
   async function apply() {
-    const alerts: string[] = [];
+    const alerts: Message[] = [];
     let written = 0;
     for (const it of items) {
       if (it._draft === it.value || Number.isNaN(it._draft)) continue;
       try {
         await cmd.commitStatistic(it.api_name, it._draft);
         written++;
-        alerts.push(`${it.name || it.api_name} set to ${it._draft}`);
+        const [name, value] = [it.name || it.api_name, it._draft];
+        alerts.push(() => t("log_statistic_set", { name, value }));
       } catch (err) {
-        alerts.push(`Failed: ${it.api_name} (${String(err)})`);
+        const name = it.api_name;
+        alerts.push(() => t("log_write_failed", { name, error: describeError(err) }));
       }
     }
     // Upload only when Steam accepted a write: with nothing pending there is
@@ -37,10 +40,10 @@
       try {
         await cmd.storeStats();
       } catch (err) {
-        alerts.unshift(`Store stats failed: ${String(err)}`);
+        alerts.unshift(() => t("log_upload_failed", { error: describeError(err) }));
       }
     }
-    onStatus(alerts.length > 0 ? alerts : "No statistic changes to commit");
+    onStatus(alerts.length > 0 ? alerts : () => t("log_no_changes"));
     // Reload in every case: a rejected upload reverts Steam's local values.
     onReload(false);
   }
@@ -53,7 +56,7 @@
 <div class="stats">
   {#if items.length === 0}
     <div class="panel stats__empty">
-      <p class="muted">No statistics were found for this game.</p>
+      <p class="muted">{t("statistics_none")}</p>
     </div>
   {:else}
     <ul class="stats__list">
@@ -79,8 +82,8 @@
   {/if}
 
   <footer class="stats__actions">
-    <button class="btn" onclick={reset}>Refresh</button>
-    <button class="btn btn--primary" onclick={apply}>Apply</button>
+    <button class="btn" onclick={reset}>{t("action_refresh")}</button>
+    <button class="btn btn--primary" onclick={apply}>{t("action_apply")}</button>
   </footer>
 </div>
 
@@ -98,15 +101,15 @@
   }
   .stats__row {
     display: grid;
-    grid-template-columns: 1fr 140px auto;
+    grid-template-columns: 1fr calc(140px * var(--font-scale)) auto;
     gap: 14px;
     align-items: center;
   }
   .stats__label { min-width: 0; }
-  .stats__name { font-weight: var(--fw-semibold); }
-  .stats__api { font-size: var(--fs-xs); font-style: italic; font-weight: var(--fw-light); }
+  .stats__name { font-weight: var(--fw-bold); overflow-wrap: anywhere; }
+  .stats__api { font-size: var(--fs-10); overflow-wrap: anywhere; }
   .stats__input { text-align: right; font-variant-numeric: tabular-nums; }
-  .stats__bounds { font-size: var(--fs-sm); font-variant-numeric: tabular-nums; }
+  .stats__bounds { font-size: var(--fs-11); font-variant-numeric: tabular-nums; }
 
   .stats__empty { text-align: center; padding: 40px; }
 
@@ -115,6 +118,6 @@
     gap: 8px;
     justify-content: flex-end;
     padding-top: 8px;
-    border-top: 1px solid var(--red-very-soft);
+    border-top: 1px solid var(--colony-divider);
   }
 </style>
