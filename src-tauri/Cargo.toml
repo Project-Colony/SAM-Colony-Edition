@@ -1,6 +1,6 @@
 [package]
 name = "samira"
-version = "0.7.0"
+version = "0.8.0"
 description = "Cross-platform Steam achievement and stat manager (SAM - Colony Edition)"
 authors = ["Project Colony"]
 edition = "2021"
