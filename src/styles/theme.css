@@ -69,16 +69,17 @@
   --font-scale: calc(var(--font-size-pref) * var(--text-size-pref));
 
   /* Type scale: every size is a base from design/typography.md times the
-     scale. scripts/check-style.mjs rejects any other font-size. */
-  --fs-10: calc(10px * var(--font-scale)); /* hints, the quietest text */
-  --fs-11: calc(11px * var(--font-scale));
-  --fs-12: calc(12px * var(--font-scale)); /* descriptions */
-  --fs-13: calc(13px * var(--font-scale)); /* body, buttons, lists */
-  --fs-14: calc(14px * var(--font-scale)); /* the gear next to the name */
-  --fs-15: calc(15px * var(--font-scale)); /* section titles */
-  --fs-18: calc(18px * var(--font-scale)); /* category headings */
-  --fs-22: calc(22px * var(--font-scale)); /* the Preferences title */
-  --fs-30: calc(30px * var(--font-scale)); /* the program name */
+     scale, rounded to a whole pixel like colony-ui's sz(). scripts/check-style.mjs
+     rejects any other font-size. */
+  --fs-10: round(10px * var(--font-scale), 1px); /* hints, the quietest text */
+  --fs-11: round(11px * var(--font-scale), 1px);
+  --fs-12: round(12px * var(--font-scale), 1px); /* descriptions */
+  --fs-13: round(13px * var(--font-scale), 1px); /* body, buttons, lists */
+  --fs-14: round(14px * var(--font-scale), 1px); /* the gear next to the name */
+  --fs-15: round(15px * var(--font-scale), 1px); /* section titles */
+  --fs-18: round(18px * var(--font-scale), 1px); /* category headings */
+  --fs-22: round(22px * var(--font-scale), 1px); /* the Preferences title */
+  --fs-30: round(30px * var(--font-scale), 1px); /* the program name */
 
   /* The three weights the font ships. */
   --fw-regular: 400;

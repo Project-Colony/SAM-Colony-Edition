@@ -346,7 +346,9 @@
 
   .prefs__body {
     display: grid;
-    grid-template-columns: calc(180px * var(--font-scale)) minmax(0, 1fr);
+    /* Capped like the sidebar in App.svelte: at 1.68x in a 960px window the
+       content still gets the room the theme cards need. */
+    grid-template-columns: min(calc(180px * var(--font-scale)), 22vw) minmax(0, 1fr);
     gap: 16px;
     flex: 1;
     min-height: 0;
