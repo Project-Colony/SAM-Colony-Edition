@@ -2,84 +2,79 @@ html, body, #app {
   margin: 0;
   padding: 0;
   height: 100%;
-  background:
-    radial-gradient(circle at 30% 10%, rgba(125, 35, 51, 0.05), transparent 60%),
-    radial-gradient(circle at 80% 90%, rgba(125, 35, 51, 0.04), transparent 55%),
-    var(--parchment);
-  color: var(--ink);
-  font-family: var(--font-body);
-  font-size: var(--fs-md);
+  background: var(--colony-bg-primary);
+  color: var(--colony-text-primary);
+  font-family: var(--colony-font);
+  font-size: var(--fs-13);
   font-weight: var(--fw-regular);
   line-height: 1.45;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   font-feature-settings: "liga" 1, "calt" 1;
+  /* Only the shipped weights, and no italics: never a synthesized face. */
+  font-synthesis: none;
 }
 
 * {
   box-sizing: border-box;
 }
 
+button, input, select {
+  font-family: inherit;
+}
+
 /* ── Primitives ─────────────────────────────────────────────── */
 
 .btn {
-  font-family: var(--font-body);
-  font-size: var(--fs-md);
+  font-size: var(--fs-13);
   font-weight: var(--fw-medium);
-  letter-spacing: var(--tracking-normal);
-  color: var(--ink);
-  background: var(--parchment);
-  border: var(--border-thin) solid var(--red);
+  color: var(--colony-text-primary);
+  background: var(--colony-btn-default);
+  border: 1px solid var(--colony-border-subtle);
   border-radius: var(--radius-input);
   padding: 5px 12px;
   cursor: pointer;
   transition: background 80ms ease;
 }
-.btn:hover  { background: var(--parchment-hover); }
-.btn:active { background: var(--parchment-pressed); }
+.btn:hover  { background: var(--colony-btn-hover); }
+.btn:active { background: var(--colony-btn-pressed); }
 .btn:disabled {
-  background: var(--parchment-disabled);
-  border-color: var(--red-soft);
-  color: var(--ink-very-dim);
+  color: var(--colony-text-dimmer);
   cursor: not-allowed;
 }
 .btn--primary {
-  background: var(--red);
-  color: var(--parchment);
-  font-weight: var(--fw-semibold);
+  background: var(--colony-accent);
+  border-color: var(--colony-accent);
+  color: var(--colony-on-accent);
+  font-weight: var(--fw-bold);
 }
-.btn--primary:hover  { background: rgb(150, 45, 62); }
-.btn--primary:active { background: rgb(100, 25, 42); }
+.btn--primary:hover  { background: color-mix(in srgb, var(--colony-accent) 85%, var(--colony-on-accent)); }
+.btn--primary:active { background: color-mix(in srgb, var(--colony-accent) 75%, var(--colony-on-accent)); }
 
 .input {
-  font-family: var(--font-body);
-  font-size: var(--fs-md);
+  font-size: var(--fs-13);
   font-weight: var(--fw-regular);
-  color: var(--ink);
-  background: var(--parchment);
-  border: var(--border-thin) solid var(--red-soft);
+  color: var(--colony-text-primary);
+  background: var(--colony-bg-input);
+  border: 1px solid var(--colony-border-subtle);
   border-radius: var(--radius-input);
   padding: 5px 9px;
   outline: none;
   width: 100%;
 }
-.input:focus { border-color: var(--red); }
-.input::placeholder {
-  color: var(--ink-very-dim);
-  font-style: italic;
-  font-weight: var(--fw-light);
-}
+.input:focus { border-color: var(--colony-accent); }
+.input::placeholder { color: var(--colony-text-placeholder); }
 
 .panel {
-  background: var(--parchment-soft);
-  border: var(--border-panel) solid var(--red);
-  border-radius: var(--radius-panel);
+  background: var(--colony-bg-card);
+  border: 1px solid var(--colony-border-subtle);
+  border-radius: var(--radius-card);
   padding: 12px;
 }
 
 .card {
-  background: var(--parchment);
-  border: var(--border-thin) solid var(--red-very-soft);
+  background: var(--colony-bg-card);
+  border: 1px solid var(--colony-border-subtle);
   border-radius: var(--radius-card);
   padding: 10px;
   display: flex;
@@ -90,26 +85,29 @@ html, body, #app {
   content-visibility: auto;
   contain-intrinsic-size: 0 64px;
 }
-.card--unlocked { border-color: var(--red-soft); }
+.card--unlocked { border-color: var(--colony-accent); }
 .card--locked   { opacity: 0.7; }
 
 .title {
-  font-family: var(--font-display);
   font-weight: var(--fw-bold);
-  color: var(--ink);
-  letter-spacing: var(--tracking-wide);
+  color: var(--colony-text-primary);
   margin: 0;
 }
 
-.muted { color: var(--ink-dim); }
-.dim   { color: var(--ink-very-dim); }
+.muted { color: var(--colony-text-muted); }
+.dim   { color: var(--colony-text-dimmer); }
 
-/* Eyebrow / overline label */
+/* Overline label */
 .eyebrow {
-  font-family: var(--font-display);
-  font-size: var(--fs-xs);
-  font-weight: var(--fw-semibold);
-  letter-spacing: var(--tracking-display);
+  font-size: var(--fs-10);
+  font-weight: var(--fw-bold);
+  letter-spacing: var(--tracking-wide);
   text-transform: uppercase;
-  color: var(--ink-dim);
+  color: var(--colony-text-muted);
+}
+
+/* A Nerd Font glyph, written as an escaped codepoint, never pasted. */
+.glyph {
+  font-family: var(--colony-glyph-font);
+  font-weight: var(--fw-regular);
 }

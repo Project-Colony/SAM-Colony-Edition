@@ -1,107 +1,115 @@
-/* H&E parchment + burgundy palette, ported from client/scripts/ui_style.gd */
+/*
+ * Fonts, the type scale and geometry. Colours are not here: every colour is a
+ * --colony-* variable that src/lib/preferences.svelte.ts sets on <html> from
+ * the vendored Colony palettes (src/lib/vendor/themes.json), with
+ * --colony-accent and --colony-on-accent for the effective accent.
+ *
+ * The three Colony fonts, vendored from colony-ui (assets/fonts/, each with
+ * its SIL Open Font License text).
+ */
 
 @font-face {
   font-family: "JetBrainsMono Nerd Font";
-  src: url("/fonts/JetBrainsMonoNerdFont-Light.ttf") format("truetype");
-  font-weight: 300;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: "JetBrainsMono Nerd Font";
-  src: url("/fonts/JetBrainsMonoNerdFont-Regular.ttf") format("truetype");
+  src: url("../../assets/fonts/JetBrainsMonoNerdFont/JetBrainsMonoNerdFont-Regular.ttf") format("truetype");
   font-weight: 400;
   font-style: normal;
-  font-display: swap;
+  font-display: block;
 }
 @font-face {
   font-family: "JetBrainsMono Nerd Font";
-  src: url("/fonts/JetBrainsMonoNerdFont-Italic.ttf") format("truetype");
-  font-weight: 400;
-  font-style: italic;
-  font-display: swap;
-}
-@font-face {
-  font-family: "JetBrainsMono Nerd Font";
-  src: url("/fonts/JetBrainsMonoNerdFont-Medium.ttf") format("truetype");
+  src: url("../../assets/fonts/JetBrainsMonoNerdFont/JetBrainsMonoNerdFont-Medium.ttf") format("truetype");
   font-weight: 500;
   font-style: normal;
-  font-display: swap;
+  font-display: block;
 }
 @font-face {
   font-family: "JetBrainsMono Nerd Font";
-  src: url("/fonts/JetBrainsMonoNerdFont-SemiBold.ttf") format("truetype");
-  font-weight: 600;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: "JetBrainsMono Nerd Font";
-  src: url("/fonts/JetBrainsMonoNerdFont-Bold.ttf") format("truetype");
+  src: url("../../assets/fonts/JetBrainsMonoNerdFont/JetBrainsMonoNerdFont-Bold.ttf") format("truetype");
   font-weight: 700;
   font-style: normal;
-  font-display: swap;
+  font-display: block;
+}
+/* OpenDyslexic ships one weight. Declaring it for the whole range keeps the
+   browser from faking a bold that the font does not have. */
+@font-face {
+  font-family: "OpenDyslexic";
+  src: url("../../assets/fonts/OpenDyslexic/OpenDyslexic-Regular.otf") format("opentype");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: block;
 }
 @font-face {
-  font-family: "JetBrainsMono Nerd Font";
-  src: url("/fonts/JetBrainsMonoNerdFont-BoldItalic.ttf") format("truetype");
-  font-weight: 700;
-  font-style: italic;
-  font-display: swap;
+  font-family: "Font Awesome 6 Free";
+  src: url("../../assets/fonts/FontAwesome/fa-solid-900.ttf") format("truetype");
+  font-weight: 900;
+  font-style: normal;
+  font-display: block;
+}
+@font-face {
+  font-family: "Font Awesome 6 Free";
+  src: url("../../assets/fonts/FontAwesome/fa-regular-400.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: block;
 }
 
 :root {
-  /* Ink (text) ramp */
-  --ink: rgb(46, 26, 20);
-  --ink-dim: rgb(102, 66, 51);
-  --ink-very-dim: rgba(140, 107, 82, 0.95);
+  /* All interface text. The dyslexia toggle swaps it for the whole window. */
+  --colony-font: "JetBrainsMono Nerd Font", monospace;
+  /* Nerd Font glyphs (\f013 gear, \f054 chevron...). OpenDyslexic has none,
+     so glyphs keep this font whatever the toggle says. */
+  --colony-glyph-font: "JetBrainsMono Nerd Font", monospace;
+  /* Glyphs outside the Nerd Font range, in Font Awesome Solid (weight 900). */
+  --colony-icon-font: "Font Awesome 6 Free";
 
-  /* Burgundy accent */
-  --red: rgb(125, 35, 51);
-  --red-soft: rgba(125, 35, 51, 0.30);
-  --red-very-soft: rgba(125, 35, 51, 0.12);
+  /* Typography size (Appearance) times text size (Accessibility): 0.7225 to
+     1.68. Both are set on <html> from the preferences. */
+  --font-size-pref: 1;
+  --text-size-pref: 1;
+  --font-scale: calc(var(--font-size-pref) * var(--text-size-pref));
 
-  /* Parchment surface ramp */
-  --parchment: rgb(255, 252, 242);
-  --parchment-hover: rgb(252, 239, 219);
-  --parchment-pressed: rgb(242, 225, 199);
-  --parchment-disabled: rgba(245, 240, 227, 0.6);
-  --parchment-soft: rgb(247, 237, 217);
-  --parchment-shadow: rgba(46, 26, 20, 0.08);
+  /* Type scale: every size is a base from design/typography.md times the
+     scale. scripts/check-style.mjs rejects any other font-size. */
+  --fs-10: calc(10px * var(--font-scale)); /* hints, the quietest text */
+  --fs-11: calc(11px * var(--font-scale));
+  --fs-12: calc(12px * var(--font-scale)); /* descriptions */
+  --fs-13: calc(13px * var(--font-scale)); /* body, buttons, lists */
+  --fs-14: calc(14px * var(--font-scale)); /* the gear next to the name */
+  --fs-15: calc(15px * var(--font-scale)); /* section titles */
+  --fs-18: calc(18px * var(--font-scale)); /* category headings */
+  --fs-22: calc(22px * var(--font-scale)); /* the Preferences title */
+  --fs-30: calc(30px * var(--font-scale)); /* the program name */
 
-  /* Typography - JetBrainsMono Nerd Font everywhere */
-  --font-display: "JetBrainsMono Nerd Font", monospace;
-  --font-body:    "JetBrainsMono Nerd Font", monospace;
-  --font-mono:    "JetBrainsMono Nerd Font", monospace;
+  /* The three weights the font ships. */
+  --fw-regular: 400;
+  --fw-medium: 500;
+  --fw-bold: 700;
 
-  /* Type scale */
-  --fs-xs:  10px;
-  --fs-sm:  11px;
-  --fs-md:  13px;
-  --fs-lg:  15px;
-  --fs-xl:  20px;
-  --fs-2xl: 26px;
-  --fs-3xl: 34px;
+  --tracking-wide: 0.06em;
 
-  /* Weight scale */
-  --fw-light:    300;
-  --fw-regular:  400;
-  --fw-medium:   500;
-  --fw-semibold: 600;
-  --fw-bold:     700;
+  --radius-input: 6px;
+  --radius-card: 8px;
+}
 
-  /* Letter spacing */
-  --tracking-tight:  -0.01em;
-  --tracking-normal:  0;
-  --tracking-wide:    0.06em;
-  --tracking-display: 0.14em;
+:root[data-dyslexia] {
+  --colony-font: "OpenDyslexic", "JetBrainsMono Nerd Font", monospace;
+}
 
-  /* Geometry */
-  --radius-input: 3px;
-  --radius-card: 4px;
-  --radius-panel: 6px;
-  --border-thin: 1px;
-  --border-panel: 2px;
-
-  color-scheme: light;
+/* Reduce motion, Animations off, or the system asking for less motion:
+   nothing moves. */
+:root[data-reduced-motion] *,
+:root[data-reduced-motion] *::before,
+:root[data-reduced-motion] *::after {
+  transition: none !important;
+  animation: none !important;
+  scroll-behavior: auto !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition: none !important;
+    animation: none !important;
+    scroll-behavior: auto !important;
+  }
 }

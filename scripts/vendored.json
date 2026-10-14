@@ -1,0 +1,19 @@
+{
+  "repository": "Project-Colony/Project-Colony-Resources",
+  "commit": "049c3c0bfe9b598e1e136656101c81443c83c657",
+  "note": "The commit colony-ui 0.1.6 was published from. Update every file below together, then this commit, with: node scripts/check-vendored.mjs --update <commit>",
+  "files": {
+    "src/lib/vendor/themes.json": "generated/themes.json",
+    "src/lib/vendor/labels.en.json": "crates/colony-ui/src/generated/labels.en.json",
+    "src/lib/vendor/labels.fr.json": "crates/colony-ui/src/generated/labels.fr.json",
+    "assets/fonts/JetBrainsMonoNerdFont/JetBrainsMonoNerdFont-Regular.ttf": "crates/colony-ui/assets/fonts/JetBrainsMonoNerdFont/JetBrainsMonoNerdFont-Regular.ttf",
+    "assets/fonts/JetBrainsMonoNerdFont/JetBrainsMonoNerdFont-Medium.ttf": "crates/colony-ui/assets/fonts/JetBrainsMonoNerdFont/JetBrainsMonoNerdFont-Medium.ttf",
+    "assets/fonts/JetBrainsMonoNerdFont/JetBrainsMonoNerdFont-Bold.ttf": "crates/colony-ui/assets/fonts/JetBrainsMonoNerdFont/JetBrainsMonoNerdFont-Bold.ttf",
+    "assets/fonts/JetBrainsMonoNerdFont/OFL.txt": "crates/colony-ui/assets/fonts/JetBrainsMonoNerdFont/OFL.txt",
+    "assets/fonts/OpenDyslexic/OpenDyslexic-Regular.otf": "crates/colony-ui/assets/fonts/OpenDyslexic/OpenDyslexic-Regular.otf",
+    "assets/fonts/OpenDyslexic/OFL.txt": "crates/colony-ui/assets/fonts/OpenDyslexic/OFL.txt",
+    "assets/fonts/FontAwesome/fa-solid-900.ttf": "crates/colony-ui/assets/fonts/FontAwesome/fa-solid-900.ttf",
+    "assets/fonts/FontAwesome/fa-regular-400.ttf": "crates/colony-ui/assets/fonts/FontAwesome/fa-regular-400.ttf",
+    "assets/fonts/FontAwesome/OFL.txt": "crates/colony-ui/assets/fonts/FontAwesome/OFL.txt"
+  }
+}

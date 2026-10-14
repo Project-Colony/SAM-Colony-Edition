@@ -9,6 +9,10 @@
     "build": "svelte-check && vite build",
     "preview": "vite preview",
     "check": "svelte-check --tsconfig ./tsconfig.json",
+    "check:i18n": "node scripts/check-i18n.mjs",
+    "check:style": "node scripts/check-style.mjs",
+    "check:vendored": "node scripts/check-vendored.mjs",
+    "test": "node --test scripts/palette.test.mjs",
     "tauri": "tauri"
   },
   "dependencies": {

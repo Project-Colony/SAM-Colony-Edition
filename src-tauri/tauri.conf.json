@@ -32,20 +32,6 @@
   "app": {
     "security": {
       "csp": "default-src 'self'; img-src 'self' https://*.steamstatic.com; connect-src ipc: https://ipc.localhost"
-    },
-    "windows": [
-      {
-        "title": "SAM - Colony Edition",
-        "theme": "Light",
-        "decorations": true,
-        "resizable": true,
-        "fullscreen": false,
-        "useHttpsScheme": true,
-        "width": 1280,
-        "height": 720,
-        "minWidth": 960,
-        "minHeight": 600
-      }
-    ]
+    }
   }
 }

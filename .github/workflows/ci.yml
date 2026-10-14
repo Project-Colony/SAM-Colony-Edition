@@ -63,6 +63,16 @@ jobs:
       # platform's native rolldown and lightningcss bindings are exercised here
       # before a release depends on them.
       - run: npm run build
+      # OS-independent frontend checks, so one leg is enough: en/fr parity,
+      # palette colours and scaled sizes only, the palette logic, and the
+      # vendored Colony themes, labels and fonts against Resources.
+      - name: Frontend checks
+        if: startsWith(matrix.platform, 'ubuntu-')
+        run: |
+          npm run check:i18n
+          npm run check:style
+          npm test
+          npm run check:vendored
       # Clippy type-checks every target, tests included, so it stands in for
       # cargo check. Each OS compiles its own cfg branches (registry lookup,
       # console handling, library loading), so every leg lints and tests.

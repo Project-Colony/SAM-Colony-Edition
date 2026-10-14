@@ -10,14 +10,15 @@
 //! time (`include_bytes!`) and extract it to a stable user-writable
 //! location on first launch. Subsequent runs reuse the cached copy.
 //!
+//! The copy is re-derivable, so it lives in SAM's Colony cache directory
+//! (`paths::cache_dir`): `~/.cache/Colony/SAM/` on Linux,
+//! `%LOCALAPPDATA%\Colony\SAM\cache\` on Windows and
+//! `~/Library/Caches/Colony/SAM/` on macOS. Nothing touches `%TEMP%`,
+//! system32, or anything that would look suspicious to anti-virus heuristics.
+//!
 //! Each SAM version extracts into its own `steamworks/<version>/` directory
 //! (see `extract`), so an upgrade never rewrites a library that an older SAM,
 //! still running, has loaded.
-//!
-//! All extraction targets `%LOCALAPPDATA%` (Windows) or `~/Library/
-//! Application Support` (macOS) - standard user-writable app data
-//! directories. Nothing touches `%TEMP%`, system32, or anything that
-//! would look suspicious to anti-virus heuristics.
 //!
 //! Loading the copy differs. Windows links steam_api64.dll with /DELAYLOAD
 //! (build.rs): the import resolves at the first Steam call, after `bootstrap`
@@ -38,15 +39,15 @@ static LOADED: OnceLock<Result<(), String>> = OnceLock::new();
 /// Extracts the Steamworks library and makes it the one Steam calls reach.
 /// Runs first thing in `main`, before anything calls into Steam.
 pub fn bootstrap() {
-    let result =
-        install().map_err(|e| format!("SAM could not load Valve's Steamworks library: {e}"));
+    let result = install();
     if let Err(e) = &result {
-        eprintln!("[bootstrap] {e}");
+        eprintln!("[bootstrap] SAM could not load Valve's Steamworks library: {e}");
     }
     let _ = LOADED.set(result);
 }
 
-/// Ok once Steam can be called. A Steam call without the library crashes SAM.
+/// Ok once Steam can be called, else why not. A Steam call without the
+/// library crashes SAM.
 pub fn ready() -> Result<(), String> {
     LOADED
         .get()
@@ -61,9 +62,7 @@ fn install() -> Result<(), String> {
     const DLL_BYTES: &[u8] = include_bytes!("../vendor/steam_api64.dll");
     const DLL_NAME: &str = "steam_api64.dll";
 
-    let local_appdata = std::env::var_os("LOCALAPPDATA").ok_or("LOCALAPPDATA is not set")?;
-    let base = PathBuf::from(local_appdata).join("SAM-Colony-Edition");
-    let dir = extract(base, DLL_NAME, DLL_BYTES)?;
+    let dir = extract(cache_base()?, DLL_NAME, DLL_BYTES)?;
 
     // SetDllDirectoryW adds `dir` to the standard DLL search path for the
     // current process. Combined with the /DELAYLOAD linker flag, the first
@@ -90,23 +89,14 @@ const LIBRARY: (&str, &[u8]) = (
 #[cfg(unix)]
 fn install() -> Result<(), String> {
     let (name, bytes) = LIBRARY;
-    let dir = extract(data_dir()?.join("SAM-Colony-Edition"), name, bytes)?;
+    let dir = extract(cache_base()?, name, bytes)?;
     stubs::load(&dir.join(name))
 }
 
-#[cfg(target_os = "macos")]
-fn data_dir() -> Result<PathBuf, String> {
-    let home = std::env::var_os("HOME").ok_or("HOME is not set")?;
-    Ok(PathBuf::from(home).join("Library/Application Support"))
-}
-
-/// XDG_DATA_HOME, or its default ~/.local/share.
-#[cfg(target_os = "linux")]
-fn data_dir() -> Result<PathBuf, String> {
-    std::env::var_os("XDG_DATA_HOME")
-        .map(PathBuf::from)
-        .or_else(|| std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".local/share")))
-        .ok_or_else(|| "neither XDG_DATA_HOME nor HOME is set".to_string())
+/// SAM's cache directory. `extract` creates it.
+fn cache_base() -> Result<PathBuf, String> {
+    crate::paths::locate::cache_dir(crate::paths::PROGRAM)
+        .map_err(|e| format!("no cache directory: {e}"))
 }
 
 /// The stubs build.rs defines for every Steamworks function, and the table
@@ -163,11 +153,11 @@ mod stubs {
 /// and leaves the new process without its DLL. The write goes through a
 /// temporary file and a rename, so a process loading the library never sees
 /// a half-written file and, on Unix, an older mapping keeps its own inode.
-// ponytail: copies left by older versions (and the one that releases before
-// this layout put directly in `base`) are never pruned, a few hundred KB per
-// release. Prune them at startup if that ever matters; on Windows a copy can
-// be in use by a running SAM that has not delay-loaded it yet, so pruning
-// must tolerate that.
+// ponytail: copies left by older versions are never pruned, a few hundred KB
+// per release, and neither are the ones older releases put under
+// <data or LocalAppData>/SAM-Colony-Edition/. Prune them at startup if that
+// ever matters; on Windows a copy can be in use by a running SAM that has not
+// delay-loaded it yet, so pruning must tolerate that.
 fn extract(base: PathBuf, name: &str, bytes: &[u8]) -> Result<PathBuf, String> {
     let dir = base.join("steamworks").join(env!("CARGO_PKG_VERSION"));
     std::fs::create_dir_all(&dir)

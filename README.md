@@ -49,6 +49,12 @@ already signed in to.
 - **Steam's verdict, not a guess:** after an upload SAM waits for Steam to
   confirm it, reports what Steam rejected, and reloads the real values.
 - Shows the game's header art and the Steam account in use.
+- **Preferences:** click **SAM** in the top-left corner, or press `Ctrl+,`, for
+  the language (English or French), the shared Project Colony themes and accent
+  colours, the text size, and the accessibility options: high contrast, a
+  dyslexia-friendly font, larger text and reduced motion. Changes apply and save
+  at once. `Ctrl+1` and `Ctrl+2` switch between Achievements and Statistics, and
+  `Esc` closes Preferences.
 
 ## What changed from upstream
 
@@ -58,8 +64,9 @@ already signed in to.
 - **No crash on games without achievements**, and transient Steamworks errors
   no longer empty the list.
 - **Linux, Windows and macOS**, with the Steam install found per platform.
-- **Svelte 5 instead of React**, with a light parchment and burgundy theme and
-  smooth scrolling on long lists.
+- **Svelte 5 instead of React**, on the Project Colony design system: the
+  shared Colony themes, fonts and type scale, English and French, and the
+  Colony Preferences page, with smooth scrolling on long lists.
 - **One executable per platform:** the Steam runtime library is embedded in the
   binary and extracted on first launch (`src-tauri/src/bootstrap.rs`).
 
@@ -96,13 +103,8 @@ chmod +x sam-colony-edition-linux && ./sam-colony-edition-linux
 ```
 
 On first launch each version extracts Valve's Steam runtime library into
-`steamworks/<version>/` under:
-
-| Platform | Directory |
-|---|---|
-| Linux | `$XDG_DATA_HOME/SAM-Colony-Edition/`, by default `~/.local/share/SAM-Colony-Edition/` |
-| Windows | `%LOCALAPPDATA%\SAM-Colony-Edition\` |
-| macOS | `~/Library/Application Support/SAM-Colony-Edition/` |
+`steamworks/<version>/` in SAM's cache directory (see [Where SAM keeps its
+files](#where-sam-keeps-its-files)).
 
 The Windows executable has no Authenticode signature, so SmartScreen may warn
 the first time. On macOS, Gatekeeper blocks the binary because Apple has not
@@ -121,6 +123,21 @@ npm run tauri build -- --no-bundle
 The executable is `src-tauri/target/release/samira` (`samira.exe` on Windows).
 `npm run tauri dev` runs SAM from source with live reload.
 
+The checks CI runs besides the build and the Rust tests:
+
+```bash
+npm run check:i18n      # English and French strings in step, every key defined
+npm run check:style     # palette colours, scaled font sizes and shipped weights only
+npm test                # palette logic: theme fallback, high contrast, text on the accent
+npm run check:vendored  # themes, labels and fonts identical to Project-Colony-Resources
+```
+
+The Colony themes, the shared Preferences labels and the fonts are vendored
+unchanged from
+[Project-Colony-Resources](https://github.com/Project-Colony/Project-Colony-Resources)
+at the commit recorded in `scripts/vendored.json`. To move to a newer commit,
+run `node scripts/check-vendored.mjs --update <commit>`.
+
 Requires Rust 1.90 or newer, the current Node LTS, and the
 [Tauri prerequisites](https://tauri.app/start/prerequisites/) for your OS. On
 Debian and Ubuntu:
@@ -128,6 +145,31 @@ Debian and Ubuntu:
 ```bash
 sudo apt install libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libsoup-3.0-dev
 ```
+
+## Where SAM keeps its files
+
+SAM follows the shared Project Colony layout, under a `Colony/SAM/` directory
+in each platform root:
+
+| What | Linux | Windows | macOS |
+|---|---|---|---|
+| Preferences: `preferences.json` | `~/.config/Colony/SAM/` | `%LOCALAPPDATA%\Colony\SAM\` | `~/Library/Application Support/Colony/SAM/` |
+| WebView data: `webview/` | `~/.local/share/Colony/SAM/` | `%LOCALAPPDATA%\Colony\SAM\` | chosen by macOS, see below |
+| Cache: `cache.json`, `steamworks/` | `~/.cache/Colony/SAM/` | `%LOCALAPPDATA%\Colony\SAM\cache\` | `~/Library/Caches/Colony/SAM/` |
+
+On Linux the roots follow `XDG_CONFIG_HOME`, `XDG_DATA_HOME` and
+`XDG_CACHE_HOME` when they are set. The cache can be deleted at any time: SAM
+downloads the app list and extracts the Steam runtime again. On macOS the
+system's WebKit ignores the data directory SAM asks for and keeps the WebView
+data under `~/Library/WebKit/` and `~/Library/Caches/`, in a folder macOS names
+after the program.
+
+Releases before this layout used `SAM-Colony-Edition/` directories (and
+`ai.projectcolony.sam/` for the WebView). On first launch SAM moves `cache.json`
+from the old cache directory, notes the move in an empty
+`legacy-cache-migrated` file in its data directory so it happens once, and
+extracts the Steam runtime again. If the move fails, SAM keeps using the old
+`cache.json`. The old directories are left in place and can be deleted.
 
 ## Documentation
 
@@ -190,9 +232,10 @@ you are already signed in to.
 | Achievements and statistics | written to your Steam account | The changes you apply go through the Steam client, which syncs them to Valve's servers. They appear on your profile like any others. |
 | Play status | reported by Steam | Opening a game starts Steamworks as that game, so Steam shows you as playing it and records playtime while SAM has it open. |
 | Steam files | read | The achievement and statistic schemas in Steam's `appcache/stats/`. On Windows, the Steam install path in `HKCU\Software\Valve\Steam`. |
-| App list cache | stored | `cache.json` in `$XDG_CACHE_HOME/SAM-Colony-Edition/` (by default `~/.cache/SAM-Colony-Edition/`) on Linux, `%LOCALAPPDATA%\SAM-Colony-Edition\` on Windows, `~/Library/Caches/SAM-Colony-Edition/` on macOS. |
-| Steam runtime library | stored | Extracted on first launch, see [Direct binary download](#direct-binary-download). |
-| WebView data | stored | The window's web engine keeps its cache, including the images above, in `$XDG_DATA_HOME/ai.projectcolony.sam/` (by default `~/.local/share/ai.projectcolony.sam/`) on Linux and `%LOCALAPPDATA%\ai.projectcolony.sam\` on Windows. On macOS the system's WebKit keeps it under `~/Library/WebKit/` and `~/Library/Caches/`, in a folder macOS names after the program. |
+| Preferences | stored | `preferences.json` in SAM's config directory, see [Where SAM keeps its files](#where-sam-keeps-its-files). It holds your Preferences choices (language, theme, accent, text sizes and the accessibility options) and nothing else. |
+| App list cache | stored | `cache.json` in SAM's cache directory. |
+| Steam runtime library | stored | Extracted on first launch into `steamworks/<version>/` in SAM's cache directory. |
+| WebView data | stored | The window's web engine keeps its cache, including the images above, in `webview/` in SAM's data directory, and on macOS where the system's WebKit chooses. |
 
 SAM itself connects to no server except the ones in this table, and only for
 the action named there. The Steam client keeps talking to Valve as it always
@@ -206,9 +249,13 @@ does.
   much of it unchanged here.
 - [Valve](https://partner.steamgames.com/): the Steamworks SDK, redistributed
   under the [Steamworks SDK Access Agreement](https://partner.steamgames.com/documentation/sdk_access_agreement).
-- [JetBrains Mono](https://www.jetbrains.com/lp/mono/) by JetBrains, as patched
-  by [Nerd Fonts](https://www.nerdfonts.com/): the interface font, under the SIL
-  Open Font License 1.1.
+- [Project-Colony-Resources](https://github.com/Project-Colony/Project-Colony-Resources):
+  the Colony themes, the shared Preferences labels and the design rules.
+- The fonts, each under the SIL Open Font License 1.1 with its licence text in
+  `assets/fonts/`: [JetBrains Mono](https://www.jetbrains.com/lp/mono/) by
+  JetBrains, as patched by [Nerd Fonts](https://www.nerdfonts.com/), for the
+  interface; [OpenDyslexic](https://opendyslexic.org/) for the dyslexia-friendly
+  option; [Font Awesome Free](https://fontawesome.com/) for icons.
 
 ## License
 
