@@ -33,6 +33,8 @@ pub struct User {
 }
 
 pub fn start_client(appid: u32) -> Result<Client, UiError> {
+    crate::bootstrap::ready().map_err(|e| UiError::with("error_steamworks_not_loaded", e))?;
+
     // init_app returns a typed error. Map the three variants to their own
     // codes so the UI can tell apart "Steam not running" from "you don't own
     // this game" instead of dumping a generic catch-all.

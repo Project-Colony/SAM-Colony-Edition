@@ -43,6 +43,7 @@
   "statistics_none": "No statistics were found for this game.",
   "action_refresh": "Refresh",
   "action_apply": "Apply changes",
+  "error_steamworks_not_loaded": "SAM could not load Valve's Steamworks library",
   "error_steam_not_running": "Steam is not running. Start Steam and sign in, then try again.",
   "error_steam_outdated": "The Steam client is out of date. Update Steam and try again.",
   "error_game_not_owned": "You don't own this game, or it isn't activated on your Steam account.",

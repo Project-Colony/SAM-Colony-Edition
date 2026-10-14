@@ -2956,10 +2956,12 @@ version = "0.7.0"
 dependencies = [
  "dirs",
  "fuzzy-matcher",
+ "libc",
  "reqwest",
  "serde",
  "serde_json",
  "steamworks",
+ "steamworks-sys",
  "tauri",
  "tauri-build",
  "windows-sys 0.61.2",

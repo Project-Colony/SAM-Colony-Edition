@@ -19,120 +19,133 @@
 //! Each SAM version extracts into its own `steamworks/<version>/` directory
 //! (see `extract`), so an upgrade never rewrites a library that an older SAM,
 //! still running, has loaded.
+//!
+//! Loading the copy differs. Windows links steam_api64.dll with /DELAYLOAD
+//! (build.rs): the import resolves at the first Steam call, after `bootstrap`
+//! has added the copy's directory to the DLL search path. Linux and macOS
+//! resolve linked libraries before `main` runs, when there is no copy yet, so
+//! there SAM does not need the library to start. build.rs defines a stub in
+//! SAM for every function the library exports, each a jump through a table,
+//! and `bootstrap` loads the copy with `dlopen` and fills the table. With
+//! nothing left for the library to provide, the Linux linker drops it, and
+//! macOS links it weak.
+
+use std::path::PathBuf;
+use std::sync::OnceLock;
+
+/// What `bootstrap` achieved, for `ready`.
+static LOADED: OnceLock<Result<(), String>> = OnceLock::new();
+
+/// Extracts the Steamworks library and makes it the one Steam calls reach.
+/// Runs first thing in `main`, before anything calls into Steam.
+pub fn bootstrap() {
+    let result = install();
+    if let Err(e) = &result {
+        eprintln!("[bootstrap] SAM could not load Valve's Steamworks library: {e}");
+    }
+    let _ = LOADED.set(result);
+}
+
+/// Ok once Steam can be called, else why not. A Steam call without the
+/// library crashes SAM.
+pub fn ready() -> Result<(), String> {
+    LOADED
+        .get()
+        .cloned()
+        .unwrap_or_else(|| Err("the Steamworks library was never loaded".to_string()))
+}
 
 #[cfg(target_os = "windows")]
-pub fn bootstrap() {
+fn install() -> Result<(), String> {
     use std::os::windows::ffi::OsStrExt;
 
     const DLL_BYTES: &[u8] = include_bytes!("../vendor/steam_api64.dll");
     const DLL_NAME: &str = "steam_api64.dll";
 
-    let Some(dir) = cache_base().and_then(|base| extract(base, DLL_NAME, DLL_BYTES)) else {
-        return;
-    };
+    let dir = extract(cache_base()?, DLL_NAME, DLL_BYTES)?;
 
     // SetDllDirectoryW adds `dir` to the standard DLL search path for the
     // current process. Combined with the /DELAYLOAD linker flag, the first
     // Steamworks call triggers a DLL load that finds our extracted copy.
     let mut wide: Vec<u16> = dir.as_os_str().encode_wide().collect();
     wide.push(0);
-    unsafe {
-        if windows_sys::Win32::System::LibraryLoader::SetDllDirectoryW(wide.as_ptr()) == 0 {
-            eprintln!("[bootstrap] SetDllDirectoryW failed");
-        }
+    if unsafe { windows_sys::Win32::System::LibraryLoader::SetDllDirectoryW(wide.as_ptr()) } == 0 {
+        return Err("SetDllDirectoryW failed".to_string());
     }
+    Ok(())
 }
 
 #[cfg(target_os = "macos")]
-pub fn bootstrap() {
-    use std::os::unix::process::CommandExt;
+const LIBRARY: (&str, &[u8]) = (
+    "libsteam_api.dylib",
+    include_bytes!("../vendor/libsteam_api.dylib"),
+);
+#[cfg(target_os = "linux")]
+const LIBRARY: (&str, &[u8]) = (
+    "libsteam_api.so",
+    include_bytes!("../vendor/libsteam_api.so"),
+);
 
-    const DYLIB_BYTES: &[u8] = include_bytes!("../vendor/libsteam_api.dylib");
-    const DYLIB_NAME: &str = "libsteam_api.dylib";
-    const BOOTSTRAPPED_ENV: &str = "SAM_COLONY_BOOTSTRAPPED";
-
-    // Already re-exec'd with DYLD_LIBRARY_PATH set: dyld will find the
-    // dylib, nothing else to do.
-    if std::env::var_os(BOOTSTRAPPED_ENV).is_some() {
-        return;
-    }
-
-    let Some(dir) = cache_base().and_then(|base| extract(base, DYLIB_NAME, DYLIB_BYTES)) else {
-        return;
-    };
-
-    // dyld reads DYLD_LIBRARY_PATH at process start, so we re-exec ourselves
-    // with it set. The flag env var stops infinite recursion.
-    let current_exe = match std::env::current_exe() {
-        Ok(p) => p,
-        Err(e) => {
-            eprintln!("[bootstrap] current_exe failed: {}", e);
-            return;
-        }
-    };
-    let args: Vec<std::ffi::OsString> = std::env::args_os().skip(1).collect();
-    let err = std::process::Command::new(&current_exe)
-        .args(&args)
-        .env(BOOTSTRAPPED_ENV, "1")
-        .env("DYLD_LIBRARY_PATH", &dir)
-        .exec();
-    eprintln!("[bootstrap] re-exec failed: {}", err);
-    std::process::exit(1);
+#[cfg(unix)]
+fn install() -> Result<(), String> {
+    let (name, bytes) = LIBRARY;
+    let dir = extract(cache_base()?, name, bytes)?;
+    stubs::load(&dir.join(name))
 }
 
-#[cfg(all(unix, not(target_os = "macos")))]
-pub fn bootstrap() {
-    use std::os::unix::process::CommandExt;
-
-    const SO_BYTES: &[u8] = include_bytes!("../vendor/libsteam_api.so");
-    const SO_NAME: &str = "libsteam_api.so";
-    const BOOTSTRAPPED_ENV: &str = "SAM_COLONY_BOOTSTRAPPED";
-
-    if std::env::var_os(BOOTSTRAPPED_ENV).is_some() {
-        return;
-    }
-
-    let Some(dir) = cache_base().and_then(|base| extract(base, SO_NAME, SO_BYTES)) else {
-        return;
-    };
-
-    // ld.so reads LD_LIBRARY_PATH at process start, so re-exec with it set.
-    let current_exe = match std::env::current_exe() {
-        Ok(p) => p,
-        Err(e) => {
-            eprintln!("[bootstrap] current_exe failed: {}", e);
-            return;
-        }
-    };
-    let args: Vec<std::ffi::OsString> = std::env::args_os().skip(1).collect();
-    // Prepend our dir to any pre-existing LD_LIBRARY_PATH.
-    let new_ld_path = match std::env::var_os("LD_LIBRARY_PATH") {
-        Some(existing) => {
-            let mut s = std::ffi::OsString::from(&dir);
-            s.push(":");
-            s.push(existing);
-            s
-        }
-        None => std::ffi::OsString::from(&dir),
-    };
-    let err = std::process::Command::new(&current_exe)
-        .args(&args)
-        .env(BOOTSTRAPPED_ENV, "1")
-        .env("LD_LIBRARY_PATH", new_ld_path)
-        .exec();
-    eprintln!("[bootstrap] re-exec failed: {}", err);
-    std::process::exit(1);
-}
-
-/// SAM's cache directory, or None (logged) when the platform has none.
-fn cache_base() -> Option<std::path::PathBuf> {
+/// SAM's cache directory. `extract` creates it.
+fn cache_base() -> Result<PathBuf, String> {
     crate::paths::locate::cache_dir(crate::paths::PROGRAM)
-        .map_err(|e| eprintln!("[bootstrap] no cache directory, skipping: {e}"))
-        .ok()
+        .map_err(|e| format!("no cache directory: {e}"))
+}
+
+/// The stubs build.rs defines for every Steamworks function, and the table
+/// they jump through.
+#[cfg(unix)]
+mod stubs {
+    use std::ffi::{c_void, CStr, CString};
+    use std::os::unix::ffi::OsStrExt;
+    use std::path::Path;
+    use std::sync::atomic::{AtomicPtr, Ordering};
+
+    // NAMES, and the stub for each, which jumps to the address at the same
+    // index in TABLE.
+    include!(concat!(env!("OUT_DIR"), "/steam_stubs.rs"));
+
+    /// Null until `load`: a stub called before that jumps to address 0.
+    static TABLE: [AtomicPtr<c_void>; NAMES.len()] =
+        [const { AtomicPtr::new(std::ptr::null_mut()) }; NAMES.len()];
+
+    /// Loads the library at `path` and points every stub at its function.
+    pub(super) fn load(path: &Path) -> Result<(), String> {
+        let path_c = CString::new(path.as_os_str().as_bytes()).map_err(|e| e.to_string())?;
+        // RTLD_GLOBAL puts its symbols in the global scope, as linking it did.
+        // It is never unloaded.
+        let lib = unsafe { libc::dlopen(path_c.as_ptr(), libc::RTLD_NOW | libc::RTLD_GLOBAL) };
+        if lib.is_null() {
+            let reason = unsafe { libc::dlerror() };
+            return Err(if reason.is_null() {
+                format!("could not load {}", path.display())
+            } else {
+                unsafe { CStr::from_ptr(reason) }
+                    .to_string_lossy()
+                    .into_owned()
+            });
+        }
+        for (slot, name) in TABLE.iter().zip(NAMES) {
+            // Null for a function this build lacks (SteamRealPath on macOS),
+            // which steamworks-rs never calls.
+            slot.store(
+                unsafe { libc::dlsym(lib, name.as_ptr()) },
+                Ordering::Relaxed,
+            );
+        }
+        Ok(())
+    }
 }
 
 /// Extracts `bytes` as `name` into `base/steamworks/<SAM version>/` and
-/// returns that directory, or logs why it could not and returns None.
+/// returns that directory, or why it could not.
 ///
 /// The directory is per version because a running SAM keeps its copy loaded.
 /// Rewriting that file in place on upgrade crashes the older process (SIGBUS
@@ -145,23 +158,20 @@ fn cache_base() -> Option<std::path::PathBuf> {
 // <data or LocalAppData>/SAM-Colony-Edition/. Prune them at startup if that
 // ever matters; on Windows a copy can be in use by a running SAM that has not
 // delay-loaded it yet, so pruning must tolerate that.
-fn extract(base: std::path::PathBuf, name: &str, bytes: &[u8]) -> Option<std::path::PathBuf> {
+fn extract(base: PathBuf, name: &str, bytes: &[u8]) -> Result<PathBuf, String> {
     let dir = base.join("steamworks").join(env!("CARGO_PKG_VERSION"));
-    if let Err(e) = std::fs::create_dir_all(&dir) {
-        eprintln!("[bootstrap] failed to create {}: {}", dir.display(), e);
-        return None;
-    }
+    std::fs::create_dir_all(&dir)
+        .map_err(|e| format!("failed to create {}: {e}", dir.display()))?;
 
     let path = dir.join(name);
     if needs_write(&path, bytes) {
         let tmp = dir.join(format!("{}.{}.tmp", name, std::process::id()));
         if let Err(e) = std::fs::write(&tmp, bytes).and_then(|()| std::fs::rename(&tmp, &path)) {
             let _ = std::fs::remove_file(&tmp);
-            eprintln!("[bootstrap] failed to write {}: {}", path.display(), e);
-            return None;
+            return Err(format!("failed to write {}: {e}", path.display()));
         }
     }
-    Some(dir)
+    Ok(dir)
 }
 
 /// Returns true if the path doesn't exist or its contents differ from `expected`.
@@ -189,11 +199,35 @@ mod tests {
         assert_eq!(std::fs::read(older.join("lib")).unwrap(), b"old");
 
         // A second launch reuses the copy and leaves no temporary file behind.
-        assert_eq!(
-            super::extract(base.clone(), "lib", b"new"),
-            Some(dir.clone())
-        );
+        assert_eq!(super::extract(base.clone(), "lib", b"new"), Ok(dir.clone()));
         assert_eq!(std::fs::read_dir(&dir).unwrap().count(), 1);
+
+        std::fs::remove_dir_all(&base).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn steam_calls_reach_the_loaded_library() {
+        use steamworks_sys as sys;
+
+        let base = std::env::temp_dir().join(format!("sam-load-test-{}", std::process::id()));
+        let (name, bytes) = super::LIBRARY;
+        let dir = super::extract(base.clone(), name, bytes).unwrap();
+        super::stubs::load(&dir.join(name)).unwrap();
+
+        // Through the stubs to plain functions of the library, which need no
+        // Steam client: arguments in, results out.
+        unsafe {
+            let mut address: sys::SteamNetworkingIPAddr = std::mem::zeroed();
+            sys::SteamAPI_SteamNetworkingIPAddr_SetIPv4(&mut address, 0x7f00_0001, 27015);
+            assert_eq!(
+                sys::SteamAPI_SteamNetworkingIPAddr_GetIPv4(&mut address),
+                0x7f00_0001
+            );
+            assert!(sys::SteamAPI_SteamNetworkingIPAddr_IsLocalHost(
+                &mut address
+            ));
+        }
 
         std::fs::remove_dir_all(&base).unwrap();
     }

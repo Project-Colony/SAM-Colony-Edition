@@ -43,6 +43,7 @@
   "statistics_none": "Aucune statistique trouvée pour ce jeu.",
   "action_refresh": "Actualiser",
   "action_apply": "Appliquer",
+  "error_steamworks_not_loaded": "SAM n'a pas pu charger la bibliothèque Steamworks de Valve",
   "error_steam_not_running": "Steam n'est pas lancé. Lancez Steam et connectez-vous, puis réessayez.",
   "error_steam_outdated": "Le client Steam n'est pas à jour. Mettez Steam à jour et réessayez.",
   "error_game_not_owned": "Ce jeu ne vous appartient pas, ou il n'est pas activé sur votre compte Steam.",

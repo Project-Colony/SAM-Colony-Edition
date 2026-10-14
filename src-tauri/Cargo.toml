@@ -24,6 +24,14 @@ steamworks = "0.13.1"
 fuzzy-matcher = "0.3"
 dirs = "=6.0.0"
 
+[dev-dependencies]
+# The raw Steamworks bindings, which steamworks keeps private, for the test
+# that calls through the stubs in src/bootstrap.rs.
+steamworks-sys = "0.13"
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
 [target.'cfg(target_os = "windows")'.dependencies]
 winreg = "0.56"
 windows-sys = { version = "0.61", features = ["Win32_System_Console", "Win32_System_LibraryLoader", "Win32_Foundation"] }

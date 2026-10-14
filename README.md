@@ -17,14 +17,13 @@ already signed in to.
 
 > **Status:** releases are built in CI and every asset is signed with the
 > Project Colony release key since v0.7.0. CI builds the frontend and checks the
-> Rust code on Linux, Windows and macOS, and runs the unit tests on Linux. There
-> are only a few unit tests and no UI tests, so achievement and statistic writes
-> against a live Steam client are tested by hand. Known gap: the Linux and macOS
-> executables need Valve's `libsteam_api` on the system library path when they
-> start, before SAM can extract its embedded copy, so on most machines they do
-> not start. The Windows executable loads the library later and is not affected.
-> The macOS executables are not signed by an Apple Developer account, and Steam
-> installed through Flatpak is not supported.
+> Rust code on Linux, Windows and macOS, runs the unit tests on Linux and macOS,
+> and starts the Linux and macOS executables on a machine without Valve's
+> `libsteam_api` installed, since the v0.7.0 ones only started where it was.
+> There are only a few unit tests and no UI tests, so achievement and statistic
+> writes against a live Steam client are tested by hand. The macOS executables
+> are not signed by an Apple Developer account, and Steam installed through
+> Flatpak is not supported.
 
 ## Why SAM
 
