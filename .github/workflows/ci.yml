@@ -82,7 +82,7 @@ jobs:
       # (src-tauri/src/bootstrap.rs), which a unit test calls through. The rest
       # is OS-independent logic, run on Windows too.
       - name: Unit tests
-        run: cargo test --locked --manifest-path src-tauri/Cargo.toml
+        run: cargo test --locked --manifest-path src-tauri/Cargo.toml --target ${{ matrix.target }}
       # v0.7.0 shipped Linux and macOS executables that did not start unless
       # Valve's libsteam_api was installed system-wide. Run the executable from
       # a directory of its own, with no library path, as a user would. On
@@ -92,9 +92,9 @@ jobs:
         if: runner.os != 'Windows'
         shell: bash
         run: |
-          cargo build --locked --manifest-path src-tauri/Cargo.toml
+          cargo build --locked --manifest-path src-tauri/Cargo.toml --target ${{ matrix.target }}
           d=$(mktemp -d)
-          cp src-tauri/target/debug/samira "$d/"
+          cp src-tauri/target/${{ matrix.target }}/debug/samira "$d/"
           if [ "$RUNNER_OS" = macOS ] && nm -m -u "$d/samira" | grep -F libsteam_api; then
             echo "::error::these symbols are bound to libsteam_api instead of SAM's own stubs"
             exit 1
