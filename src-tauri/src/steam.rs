@@ -77,7 +77,7 @@ pub fn start_client(appid: u32) -> Result<Client, UiError> {
         for _ in 0..50 {
             client.run_callbacks();
             ::std::thread::sleep(::std::time::Duration::from_millis(100));
-            if *waiting.lock().unwrap() == false {
+            if !*waiting.lock().unwrap() {
                 break;
             }
         }

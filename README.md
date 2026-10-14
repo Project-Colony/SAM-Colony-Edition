@@ -16,8 +16,8 @@ from one self-contained executable that talks to the Steam client you are
 already signed in to.
 
 > **Status:** releases are built in CI and every asset is signed with the
-> Project Colony release key since v0.7.0. CI builds the frontend and checks the
-> Rust code on Linux, Windows and macOS, runs the unit tests on Linux and macOS,
+> Project Colony release key since v0.7.0. CI builds the frontend, lints the
+> Rust code with Clippy and runs the unit tests on Linux, Windows and macOS,
 > and starts the Linux and macOS executables on a machine without Valve's
 > `libsteam_api` installed, since the v0.7.0 ones only started where it was.
 > There are only a few unit tests and no UI tests, so achievement and statistic
@@ -138,7 +138,7 @@ unchanged from
 at the commit recorded in `scripts/vendored.json`. To move to a newer commit,
 run `node scripts/check-vendored.mjs --update <commit>`.
 
-Requires Rust 1.88 or newer, the current Node LTS, and the
+Requires Rust 1.90 or newer, the current Node LTS, and the
 [Tauri prerequisites](https://tauri.app/start/prerequisites/) for your OS. On
 Debian and Ubuntu:
 
