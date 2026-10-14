@@ -166,8 +166,10 @@ after the program.
 
 Releases before this layout used `SAM-Colony-Edition/` directories (and
 `ai.projectcolony.sam/` for the WebView). On first launch SAM moves `cache.json`
-from the old cache directory and extracts the Steam runtime again; the old
-directories are left in place and can be deleted.
+from the old cache directory, notes the move in an empty
+`legacy-cache-migrated` file in its data directory so it happens once, and
+extracts the Steam runtime again. If the move fails, SAM keeps using the old
+`cache.json`. The old directories are left in place and can be deleted.
 
 ## Documentation
 

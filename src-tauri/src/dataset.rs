@@ -40,25 +40,53 @@ pub fn fetch_games() -> Result<(Vec<Game>, &'static str), Box<dyn std::error::Er
 
 fn get_cache_path() -> Result<PathBuf, Box<dyn std::error::Error>> {
     let path = paths::cache_dir(paths::PROGRAM)?.join("cache.json");
-    if let Some(root) = dirs::cache_dir() {
-        migrate_legacy_cache(&root.join("SAM-Colony-Edition").join("cache.json"), &path);
-    }
-    Ok(path)
+    let (Some(root), Ok(data)) = (dirs::cache_dir(), paths::data_dir(paths::PROGRAM)) else {
+        return Ok(path);
+    };
+    Ok(migrate_legacy_cache(
+        &root.join("SAM-Colony-Edition").join("cache.json"),
+        &path,
+        &data.join(MIGRATED_MARKER),
+    ))
 }
 
+/// Written once the legacy games list has moved. It sits in the data
+/// directory, not the cache, so clearing the cache does not bring back a
+/// legacy copy that the move had to leave behind.
+const MIGRATED_MARKER: &str = "legacy-cache-migrated";
+
 /// Moves the games list from where releases before the Colony layout kept it,
-/// `<cache root>/SAM-Colony-Edition/cache.json`, when the new copy is missing.
+/// `<cache root>/SAM-Colony-Edition/cache.json`, and returns the file to use.
 ///
-/// A rename keeps the file's age, so freshness is judged as before. If it
-/// fails (another volume, a locked file), the copy is the fallback and the old
-/// file stays; a failed copy just means the list is downloaded again.
+/// It runs until it has moved a file: then `marker` is written and later
+/// starts skip it. A new copy that already exists is never overwritten. A
+/// rename keeps the file's age, so freshness is judged as before; if it fails
+/// (another volume, a locked file), a copy dated like the original is the
+/// fallback and the old file stays. If both fail, SAM keeps using the legacy
+/// file, as filesystem.md requires of a failed migration.
 // ponytail: the legacy SAM-Colony-Edition/ directory is never deleted here, as
 // filesystem.md requires for the release that adds the move. Prune it in a
 // later release.
-fn migrate_legacy_cache(legacy: &Path, path: &Path) {
-    if !path.exists() && legacy.exists() && std::fs::rename(legacy, path).is_err() {
-        let _ = std::fs::copy(legacy, path);
+fn migrate_legacy_cache(legacy: &Path, path: &Path, marker: &Path) -> PathBuf {
+    if marker.exists() || path.exists() || !legacy.exists() {
+        return path.to_path_buf();
     }
+    let copy = || -> std::io::Result<()> {
+        std::fs::copy(legacy, path)?;
+        if let Ok(modified) = std::fs::metadata(legacy).and_then(|m| m.modified()) {
+            let _ = std::fs::File::options()
+                .write(true)
+                .open(path)
+                .and_then(|f| f.set_modified(modified));
+        }
+        Ok(())
+    };
+    if std::fs::rename(legacy, path).is_err() && copy().is_err() {
+        let _ = std::fs::remove_file(path);
+        return legacy.to_path_buf();
+    }
+    let _ = std::fs::write(marker, "");
+    path.to_path_buf()
 }
 
 fn cache_is_fresh(path: &PathBuf) -> bool {
@@ -130,20 +158,49 @@ pub fn fuzzy_search(games: &[Game], query: &str, limit: usize) -> Vec<Game> {
 #[cfg(test)]
 mod tests {
     #[test]
-    fn the_legacy_cache_moves_only_when_the_new_one_is_missing() {
+    fn the_legacy_cache_moves_once_and_never_over_a_new_one() {
         let dir = std::env::temp_dir().join(format!("sam-cache-migration-{}", std::process::id()));
         std::fs::create_dir_all(dir.join("old")).unwrap();
-        let (legacy, path) = (dir.join("old/cache.json"), dir.join("cache.json"));
+        let (legacy, path, marker) =
+            (dir.join("old/cache.json"), dir.join("cache.json"), dir.join("marker"));
+
+        // Nothing to move: the new path, and no marker, so a later start looks again.
+        assert_eq!(super::migrate_legacy_cache(&legacy, &path, &marker), path);
+        assert!(!marker.exists());
 
         std::fs::write(&legacy, "[1]").unwrap();
-        super::migrate_legacy_cache(&legacy, &path);
+        assert_eq!(super::migrate_legacy_cache(&legacy, &path, &marker), path);
         assert_eq!(std::fs::read_to_string(&path).unwrap(), "[1]");
         assert!(!legacy.exists(), "a rename leaves no copy behind");
+        assert!(marker.exists());
+
+        // Once marked, a legacy file is left alone even with the cache cleared.
+        std::fs::write(&legacy, "[2]").unwrap();
+        std::fs::remove_file(&path).unwrap();
+        assert_eq!(super::migrate_legacy_cache(&legacy, &path, &marker), path);
+        assert!(!path.exists());
 
         // An existing new cache is never overwritten by a legacy one.
-        std::fs::write(&legacy, "[2]").unwrap();
-        super::migrate_legacy_cache(&legacy, &path);
+        std::fs::remove_file(&marker).unwrap();
+        std::fs::write(&path, "[1]").unwrap();
+        assert_eq!(super::migrate_legacy_cache(&legacy, &path, &marker), path);
         assert_eq!(std::fs::read_to_string(&path).unwrap(), "[1]");
+
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn a_failed_move_keeps_the_legacy_cache() {
+        let dir = std::env::temp_dir().join(format!("sam-cache-fallback-{}", std::process::id()));
+        std::fs::create_dir_all(dir.join("old")).unwrap();
+        let legacy = dir.join("old/cache.json");
+        std::fs::write(&legacy, "[1]").unwrap();
+        // The new cache's directory does not exist, so neither rename nor copy works.
+        let path = dir.join("missing/cache.json");
+        let marker = dir.join("marker");
+
+        assert_eq!(super::migrate_legacy_cache(&legacy, &path, &marker), legacy);
+        assert!(legacy.exists() && !marker.exists());
 
         std::fs::remove_dir_all(&dir).unwrap();
     }
