@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.1](https://github.com/Project-Colony/SAM-Colony-Edition/compare/v0.8.0...v0.8.1) (2026-11-09)
+
+
+### Fixes
+
+* **deps:** update dependencies and Rust to 1.99 ([#50](https://github.com/Project-Colony/SAM-Colony-Edition/issues/50)) ([ab3ffa9](https://github.com/Project-Colony/SAM-Colony-Edition/commit/ab3ffa9cf31b3863156c8ce1260957cb10e1250d))
+
 ## [0.8.0](https://github.com/Project-Colony/SAM-Colony-Edition/compare/v0.7.0...v0.8.0) (2026-10-14)
 
 
