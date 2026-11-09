@@ -4,9 +4,8 @@ version = "0.8.0"
 description = "Cross-platform Steam achievement and stat manager (SAM - Colony Edition)"
 authors = ["Project Colony"]
 edition = "2021"
-# The oldest toolchain the locked dependencies accept (tauri 2.12 and muda 0.20
-# need 1.90); CI builds on exactly this toolchain.
-rust-version = "1.90"
+# The minimum Rust toolchain; CI builds on exactly this toolchain.
+rust-version = "1.99"
 # Derivative work of jsnli/Samira, which is GPL-3.0. Upstream ships the bare
 # GPLv3 text with no "or any later version" notice, so no "-or-later" is claimed.
 license = "GPL-3.0-only"
@@ -15,10 +14,10 @@ repository = "https://github.com/Project-Colony/SAM-Colony-Edition"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [build-dependencies]
-tauri-build = { version = "2.7.2", features = [] }
+tauri-build = { version = "2.7.4", features = [] }
 
 [dependencies]
-tauri = { version = "2.12.3", features = [] }
+tauri = { version = "2.12.5", features = [] }
 reqwest = { version = "0.13.5", features = ["blocking", "json"] }
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"
@@ -32,7 +31,7 @@ dirs = "7.0.0"
 steamworks-sys = "0.13.0"
 
 [target.'cfg(unix)'.dependencies]
-libc = "0.2.190"
+libc = "0.2.191"
 
 [target.'cfg(target_os = "windows")'.dependencies]
 winreg = "0.56.0"
