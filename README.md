@@ -138,7 +138,7 @@ unchanged from
 at the commit recorded in `scripts/vendored.json`. To move to a newer commit,
 run `node scripts/check-vendored.mjs --update <commit>`.
 
-Requires Rust 1.90 or newer, the current Node LTS, and the
+Requires Rust 1.99 or newer, the current Node LTS, and the
 [Tauri prerequisites](https://tauri.app/start/prerequisites/) for your OS. On
 Debian and Ubuntu:
 
