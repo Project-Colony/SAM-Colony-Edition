@@ -13,6 +13,14 @@ updates:
     directory: /
     schedule:
       interval: weekly
+    # The shared signing workflow stays at the organisation pin, which moves
+    # for every program at once: design/releases.md in
+    # Project-Colony-Resources, "The pin". A Dependabot PR would move one
+    # repository alone. Dependabot names that dependency after the workflow
+    # path (Project-Colony/Project-Colony-Resources/.github/workflows/...), so
+    # the rule needs the trailing wildcard to match it.
+    ignore:
+      - dependency-name: "Project-Colony/Project-Colony-Resources*"
     groups:
       actions:
         patterns: ["*"]
@@ -48,6 +56,11 @@ updates:
       # Remove this once a svelte-check release supports TypeScript 7 directly.
       - dependency-name: typescript
         update-types: ["version-update:semver-major"]
+      # vite pins rolldown to one minor (~1.2 for vite 8.3), so a newer
+      # rolldown minor cannot land on its own and the update job fails with
+      # NoChangeError (run of 2026-11-13). rolldown moves with vite instead.
+      - dependency-name: rolldown
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
     groups:
       npm-minor:
         update-types: ["minor", "patch"]
